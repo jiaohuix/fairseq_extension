@@ -7,13 +7,13 @@ paper: [《Symbolic Discovery of Optimization Algorithms》](https://arxiv.org/a
 1 prepare iwslt14 de-en
 
 ```shell
-bash examples/prepare-iwslt14.sh
+bash examples/lion/prepare-iwslt14.sh
 ```
 
 2 binarize
 
 ```shell
-bash examples/binarize.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen y
+bash examples/lion/binarize.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen y
 ```
 
 3 train
@@ -22,14 +22,14 @@ bash examples/binarize.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen y
 
   - ```shell
     mkdir -p ckpt/adamw
-    bash examples/train_base.sh data-bin/iwslt14_deen  ckpt/adamw
+    bash examples/lion/train_base.sh data-bin/iwslt14_deen  ckpt/adamw
     ```
 
 - 3.2 lion:
 
   - ```shell
     mkdir -p  ckpt/lion
-    bash examples/train_base.sh data-bin/iwslt14_deen  ckpt/lion
+    bash examples/lion/train_base.sh data-bin/iwslt14_deen  ckpt/lion
     
     # --user-dir extension --optimizer lion --lion-betas '(0.95, 0.98)' --lr 5e-5 --weight-decay 0.001 --lr-scheduler cosine
     ```
@@ -37,8 +37,8 @@ bash examples/binarize.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen y
 4 evaluate
 
 ```shell
-bash examples/evaluate.sh de en data-bin/iwslt14_deen ckpt/adamw/checkpoint_best.pt adamw
-bash examples/evaluate.sh de en data-bin/iwslt14_deen ckpt/lion/checkpoint_best.pt lion
+bash examples/lion/evaluate.sh de en data-bin/iwslt14_deen ckpt/adamw/checkpoint_best.pt adamw
+bash examples/lion/evaluate.sh de en data-bin/iwslt14_deen ckpt/lion/checkpoint_best.pt lion
 ```
 
 | Optimizer | BLEU | Memory |

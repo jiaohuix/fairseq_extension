@@ -5,7 +5,7 @@
 
 ```shell
 pip install fairseq
-git clone https://github.com/MiuGod0126/fairseq_extension.git
+git clone https://github.com/jiaohuix/fairseq_extension.git
 cd fairseq_extension
 # --user-dir extension   xx paramaters
 ```
@@ -14,5 +14,6 @@ cd fairseq_extension
 
 ## example
 
-1. [lion optimizer](./examples/lion/README.md)    23/2/23
-
+1. [lion optimizer](./examples/lion/README.md)    
+2. [BiBert](./examples/BIBERT) 
+3. [Bert-fused](./examples/bert_nmt_extensions ) 

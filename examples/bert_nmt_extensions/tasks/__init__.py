@@ -1,0 +1,1 @@
+from .bert_nmt import BertNMTTask,BertNMTConfig

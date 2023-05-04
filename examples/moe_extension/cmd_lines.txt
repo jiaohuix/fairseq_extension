@@ -1,0 +1,24 @@
+# raw
+data-bin/iwslt14 --arch transformer_iwslt_de_en  --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.3 --weight-decay 0.0001 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --max-tokens 4096 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric
+
+
+data-bin/iwslt14 --user-dir moe_extension --task moe_translation --use-der --entity-dict entity_dict.txt --arch moe_transformer_iwslt_de_en --moe-freq  2 --moe-cmr  --moe-expert-count 8 --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.3 --weight-decay 0.0001 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --max-tokens 4096 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric
+
+
+data-bin/iwslt14  --max-tokens 4096 --user-dir moe_extension   --task moe_translation  --entity-dict entity_dict.txt --arch moe_transformer_iwslt_de_en --moe-freq  2 --moe-cmr  --moe-expert-count 8 --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.3 --weight-decay 0.0001 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric  --num-workers 0
+
+
+data-bin/iwslt14  --max-tokens 4096 --user-dir moe_extension   --task moe_translation --use-der --entity-dict entity_dict.txt --arch moe_transformer_iwslt_de_en --moe-freq  2 --moe-cmr  --moe-expert-count 8 --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.3 --weight-decay 0.0001 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric  --num-workers 0
+
+
+# gshard
+data-bin/iwslt14  --max-tokens 4096 --user-dir moe_extension --task moe_translation --aux-w 0.01  --arch moe_transformer_iwslt_de_en --moe-freq  2  --moe-expert-count 4 --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.2 --weight-decay 0.0001 --criterion label_smoothed_cross_entropy_w_moe  --label-smoothing 0.1 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric  --num-workers 0
+
+
+# raw moe criterion (in NLLB)
+## gshard
+data-bin/iwslt14  --max-tokens 4096 --user-dir moe_extension --task moe_translation   --arch moe_transformer_iwslt_de_en --moe-freq  2  --moe-expert-count 4 --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.2 --weight-decay 0.0001 --criterion moe_label_smoothed_cross_entropy --moe-gate-loss-wt 0.01 --label-smoothing 0.1 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric  --num-workers 0
+
+## cmr
+data-bin/iwslt14  --max-tokens 4096 --user-dir moe_extension --task moe_translation   --arch moe_transformer_iwslt_de_en --moe-freq  2  --moe-expert-count 4 --fp16 --optimizer adam  --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.2 --weight-decay 0.0001 --criterion moe_label_smoothed_cross_entropy --moe-gate-loss-wt 0.01 --cmr-gate-loss-p 0.8  --cmr-gate-loss-wt 1. --label-smoothing 0.1 --eval-bleu  --best-checkpoint-metric bleu --maximize-best-checkpoint-metric  --num-workers 0
+

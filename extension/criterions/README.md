@@ -8,6 +8,9 @@
 
 ```shell
 --user-dir extension --criterion reg_label_smoothed_cross_entropy --reg-alpha 5
+# or fairseq 0.12
+--criterion label_smoothed_cross_entropy_with_rdrop --rdrop-alpha 5.
+
 ```
 
 

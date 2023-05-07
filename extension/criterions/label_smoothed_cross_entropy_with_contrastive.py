@@ -87,6 +87,9 @@ class LabelSmoothedCrossEntropyCriterionWithContrastive(
             encoder_output = encoder_out[0].transpose(0, 1) # error2: list can't transpose
             src_tokens = sample["net_input"]["src_tokens"]
             mask = (src_tokens != self.padding_idx)
+            # float * bool = false部分抹0
+            # sum(dim=1)： seq_len求和， [B T C] -> [B C]
+            # mask.float().sum(dim=1).unsqueeze(-1)： [B 1] 求序列个数，对非pad的序列求平均
             encoder_embedding = (encoder_output * mask.unsqueeze(-1)).sum(dim=1) / mask.float().sum(dim=1).unsqueeze(
                 -1)  # [batch, hidden_size]
             return encoder_embedding

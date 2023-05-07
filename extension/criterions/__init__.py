@@ -1,0 +1,2 @@
+from .reg_label_smooth_cross_entropy import RegLabelSmoothedCrossEntropyCriterion,RdropCriterionConfig
+from .label_smoothed_cross_entropy_with_contrastive import LabelSmoothedCrossEntropyCriterionWithContrastive

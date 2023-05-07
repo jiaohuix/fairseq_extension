@@ -15,6 +15,13 @@ cd fairseq_extension
 ## example
 
 1. [lion optimizer](./examples/lion/README.md)    
+
 2. [BiBert](./examples/BIBERT) 
+
 3. [Bert-fused](./examples/bert_nmt_extensions ) 
+
 4. [criterions](./extension/criterions/README.md) : Rdrop, mRASP loss
+
+5. [contrastive_extension](./examples/contrastive_extension/README.md)
+
+   

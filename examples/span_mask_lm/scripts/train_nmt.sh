@@ -7,7 +7,7 @@ tgt=${5:-"en"}
 tokens=${6:-"4096"}
 updates=${7:-"60000"}
 mkdir -p $SAVE
-if [ ! -f "$PTM" ]
+if [ -f "$PTM" ]
 then
 finetune_args="--reset-lr-scheduler --reset-optimizer --reset-dataloader --restore-file $PTM"
 else

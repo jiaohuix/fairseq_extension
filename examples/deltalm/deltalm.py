@@ -116,7 +116,7 @@ def upgrade_state_dict_for_deltalm(
 
     with open(pretrained_checkpoint, "rb") as f:
         state = torch.load(f, map_location=torch.device("cpu"))
-    pretrained_state_dict = state["weights"]
+    pretrained_state_dict = state
 
     new_pretrained_state_dict = {}
     # 修改key

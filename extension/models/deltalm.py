@@ -17,7 +17,7 @@
 '''
 import os
 from typing import Any, Dict, List, Optional, Tuple
-
+import json
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -47,10 +47,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 bert_key_map = {
-    "bert.":"",
-    "roberta.":"",
+    "bert.": "",
+    "roberta.": "",
     ##  embed
     "embeddings.word_embeddings": "embed_tokens",
     "embeddings.position_embeddings": "embed_positions",
@@ -70,41 +69,45 @@ bert_key_map = {
 lm_head = "lm_head.decoder"
 lm_head = "cls.predictions.decoder"
 
+
 def reduce_func(vecs, reduce="mean"):
-  if reduce=="mean":
-    return torch.mean(vecs,dim=0)
-  elif reduce=="sum":
-    return torch.sum(vecs,dim=0)
-  return vecs[0]
+    if reduce == "mean":
+        return torch.mean(vecs, dim=0)
+    elif reduce == "sum":
+        return torch.sum(vecs, dim=0)
+    return vecs[0]
 
 
 # 遍历map，获取对应的raw向量
 def map_vocab(new: Tensor,
               raw: Tensor,
-              vocab_map: Dict[int,List[int]] = None,
-              reduce:str ="mean"):
-  if vocab_map is None:
-    init_len = min(new.size(0),raw.size(0))
-    new[:init_len] = raw[:init_len]
-    return new
-  for new_idx,raw_idxs in vocab_map.items():
-    raw_idxs = torch.tensor(raw_idxs)
-    raw_vecs = raw.index_select(dim=0,index=raw_idxs)
-    reduced_vec = reduce_func(raw_vecs, reduce)
-    new[new_idx] = reduced_vec
-    return new
+              key: str ,
+              vocab_map: Dict[int, List[int]] = None,
+              reduce: str = "mean"):
+    if (vocab_map is None) or ("embed_positions" in key):
+        init_len = min(new.size(0), raw.size(0))
+        new[:init_len] = raw[:init_len]
+        return new
+    for new_idx, raw_idxs in vocab_map.items():
+        raw_idxs = torch.tensor(raw_idxs)
+        raw_vecs = raw.index_select(dim=0, index=raw_idxs)
+        reduced_vec = reduce_func(raw_vecs, reduce)
+        new[new_idx] = reduced_vec
+        return new
+
 
 def read_vocab_map(file):
     if not os.path.exists(file):
         return None
-    with open(file,'r',encoding='utf-8') as f:
-        data=json.load(f)
-    vocab_map = {} # idx:[idxs...]
+    with open(file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    vocab_map = {}  # idx:[idxs...]
     for key, vals in data.items():
         vocab_map[int(key)] = [int(v) for v in vals]
     return vocab_map
 
-def update_key(key,key_map, lm_head="",is_encoder=True):
+
+def update_key(key, key_map, lm_head="", is_encoder=True):
     # 偶数是self
     # 奇数是cross
     odd_map = {
@@ -132,7 +135,8 @@ def update_key(key,key_map, lm_head="",is_encoder=True):
     if not is_encoder:
         key = key.replace("encoder", "decoder")
         # key = key.replace("cls.predictions.decoder", "decoder.output_projection")
-        key = key.replace(lm_head, "decoder.output_projection")
+        if lm_head != "":
+            key = key.replace(lm_head, "decoder.output_projection")
         # 交替
         if ".layers." in key:
             # 获取layer
@@ -150,11 +154,13 @@ def update_key(key,key_map, lm_head="",is_encoder=True):
 
     return key
 
+
 def upgrade_state_dict_for_deltalm(
         state_dict: Dict[str, Any],
         pretrained_checkpoint: str,
-        key_map: Dict[str,str],
-        vocab_map: Dict[int,List[int]]=None ,
+        key_map: Dict[str, str],
+        vocab_map: Dict[int, List[int]] = None,
+        reduce: str = "mean",
         lm_head: str = "",
         is_encoder=True,
 ) -> Dict[str, Any]:
@@ -168,7 +174,7 @@ def upgrade_state_dict_for_deltalm(
     new_pretrained_state_dict = {}
     # 修改key
     for key in pretrained_state_dict.keys():
-        new_key = update_key(key,key_map=key_map,lm_head=lm_head, is_encoder=is_encoder)
+        new_key = update_key(key, key_map=key_map, lm_head=lm_head, is_encoder=is_encoder)
         new_key = new_key.replace('encoder.', '')
         new_key = new_key.replace('decoder.', '')
         new_pretrained_state_dict[new_key] = pretrained_state_dict[key]
@@ -176,7 +182,8 @@ def upgrade_state_dict_for_deltalm(
     pretrained_state_dict = new_pretrained_state_dict
 
     # 修改weight
-    vocab_keys = ["embed_tokens", "output_projection"]
+    vocab_keys = ["embed_tokens", "output_projection", "embed_positions"]
+    prefix = "encoder" if is_encoder else "decoder"
     for key in state_dict.keys():
         if key in pretrained_state_dict.keys():
             pretrained_weight = pretrained_state_dict[key]
@@ -184,10 +191,11 @@ def upgrade_state_dict_for_deltalm(
             for vocab_key in vocab_keys:
                 # 1. 没有映射 3.有映射
                 if vocab_key in key:
-                    pretrained_weight = map_vocab(state[key], pretrained_weight,vocab_map,reduce)
+                    pretrained_weight = map_vocab(state_dict[key], pretrained_weight,key ,vocab_map, reduce)
             state_dict[key] = pretrained_weight
+
         else:
-            print(f"key {key} not initialized.")
+            print(f"{prefix} key {key} not initialized.")
 
     return state_dict
 
@@ -206,27 +214,39 @@ class DeltaLMModel(TransformerModel):
         )
 
         parser.add_argument(
+            "--pretrained-tgt-checkpoint",
+            type=str,
+
+        )
+        # 那要tgt词表映射
+
+        parser.add_argument(
             "--reduce",
             type=str,
             default="mean",
-            choices = ["mean","sum"],
-            help = "reduce vocab method [mean/sum/max]."
+            choices=["mean", "sum"],
+            help="reduce vocab method [mean/sum/max]."
         )
 
         parser.add_argument(
             "--vocab-map",
             type=str,
             default="",
-            help = "map new vocab to raw vocab (json file)."
+            help="map new vocab to raw vocab (json file)."
+        )
+
+        parser.add_argument(
+            "--vocab-map-tgt",
+            type=str,
+            help="map tgt new vocab to raw vocab (json file)."
         )
 
         parser.add_argument(
             "--lm-head",
             type=str,
             default="",
-            help = "lm-head."
+            help="lm-head."
         )
-        
 
     @classmethod
     def build_encoder(cls, args, tgt_dict, embed_tokens):
@@ -245,7 +265,8 @@ class DeltaLMEncoder(TransformerEncoderBase):
                 state_dict=self.state_dict(),
                 pretrained_checkpoint=args.pretrained_checkpoint,
                 key_map=bert_key_map,
-                vocab_map = read_vocab_map(args.vocab_map),
+                vocab_map=read_vocab_map(args.vocab_map),
+                reduce=args.reduce,
                 lm_head=args.lm_head,
                 is_encoder=True,
             )
@@ -257,11 +278,18 @@ class DeltaLMDecoder(TransformerDecoderBase):
     def __init__(self, args, dictionary, embed_tokens, no_encoder_attn=False):
         super().__init__(args, dictionary, embed_tokens, no_encoder_attn)
         if getattr(args, "pretrained_checkpoint", "") != "":
+            ckpt_tgt = args.pretrained_checkpoint
+            vocab_map_tgt = args.vocab_map
+            if getattr(args, "pretrained_tgt_checkpoint", "") != "":
+                ckpt_tgt = args.pretrained_tgt_checkpoint
+                vocab_map_tgt = args.vocab_map_tgt
+
             deltalm_loaded_state_dict = upgrade_state_dict_for_deltalm(
                 state_dict=self.state_dict(),
-                pretrained_checkpoint=args.pretrained_checkpoint,
+                pretrained_checkpoint=ckpt_tgt,
                 key_map=bert_key_map,
-                vocab_map=read_vocab_map(args.vocab_map),
+                vocab_map=read_vocab_map(vocab_map_tgt),
+                reduce=args.reduce,
                 lm_head=args.lm_head,
                 is_encoder=False,
             )

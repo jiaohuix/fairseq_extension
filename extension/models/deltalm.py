@@ -135,8 +135,8 @@ def update_key(key, key_map, lm_head="", is_encoder=True):
     if not is_encoder:
         key = key.replace("encoder", "decoder")
         # key = key.replace("cls.predictions.decoder", "decoder.output_projection")
-        if lm_head != "":
-            key = key.replace(lm_head, "decoder.output_projection")
+        if lm_head != "" and lm_head in key:
+            return "decoder.output_projection.weight"
         # 交替
         if ".layers." in key:
             # 获取layer
@@ -180,7 +180,6 @@ def upgrade_state_dict_for_deltalm(
         new_pretrained_state_dict[new_key] = pretrained_state_dict[key]
 
     pretrained_state_dict = new_pretrained_state_dict
-
     # 修改weight
     vocab_keys = ["embed_tokens", "output_projection", "embed_positions"]
     prefix = "encoder" if is_encoder else "decoder"

@@ -16,7 +16,7 @@ fi
 
 
 fairseq-train \
-    data-bin/iwslt14.tokenized.de-en --save-dir checkpoints/nmt_ft -s $src -t $tgt $finetune_args \
+    $DATA --save-dir  $SAVE -s $src -t $tgt $finetune_args \
     --arch transformer_iwslt_de_en --share-all-embeddings \
     --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 \
     --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 \

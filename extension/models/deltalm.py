@@ -75,8 +75,9 @@ def reduce_func(vecs, reduce="mean"):
         return torch.mean(vecs, dim=0)
     elif reduce == "sum":
         return torch.sum(vecs, dim=0)
-    return vecs[0]
-
+    elif reduce == "top1":
+        return vecs[0]
+    raise ValueError(f"no reduce method {reduce}")
 
 # 遍历map，获取对应的raw向量
 def map_vocab(new: Tensor,
@@ -223,8 +224,8 @@ class DeltaLMModel(TransformerModel):
             "--reduce",
             type=str,
             default="mean",
-            choices=["mean", "sum"],
-            help="reduce vocab method [mean/sum/max]."
+            choices=["mean", "sum", "top1"],
+            help="reduce vocab method [mean/sum/top1]."
         )
 
         parser.add_argument(

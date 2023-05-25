@@ -52,8 +52,8 @@ bash bash span_mask_lm/scripts/eval.sh data-bin/iwslt14.tokenized.de-en checkpoi
 4.1 先进行 span corruption的预训练，然后进行nmt微调。
 
 ```shell
-# <data> <save> <tokens=2048>(opt) <updates=50000>(opt)   <density=0.15>(opt)  <length=3>(opt)
-bash span_mask_lm/scripts/pretrain_span.sh data-bin/span_corrup checkpoints/span_lm 4096 50000 0.15 3
+# <data> <save> <tokens=2048>(opt) <updates=15000>(opt)   <density=0.15>(opt)  <length=3>(opt)
+bash span_mask_lm/scripts/pretrain_span.sh data-bin/span_corrup checkpoints/span_lm 4096 15000 0.15 3
 ```
 
 ~~4.2 评估预训练任务~~
@@ -82,8 +82,8 @@ bash bash span_mask_lm/scripts/eval.sh data-bin/iwslt14.tokenized.de-en checkpoi
 5.1 先进行 translation span corruption的预训练，然后进行nmt微调。（数据不同）
 
 ```shell
-# <data> <save> <tokens=2048>(opt) <updates=50000>(opt)  <density=0.15>(opt)  <length=3>(opt)
-bash span_mask_lm/scripts/pretrain_span.sh data-bin/trans_span_corrup checkpoints/trans_span_lm 4096 50000 0.5 3
+# <data> <save> <tokens=2048>(opt) <updates=15000>(opt)  <density=0.15>(opt)  <length=3>(opt)
+bash span_mask_lm/scripts/pretrain_span.sh data-bin/trans_span_corrup checkpoints/trans_span_lm 4096 15000 0.5 3
 
 ```
 

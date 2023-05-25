@@ -4,7 +4,10 @@ SAVE=$2
 mkdir -p $SAVE
 tokens=${3:-"2048"}
 updates=${4:-"50000"}
-fairseq-train --task span_masked_lm \
+density=${5:-"0.15"}
+length=${6:-"3"}
+
+fairseq-train --task span_masked_lm --noise-density $density --mean-noise-span-length $length \
   $DATA  --save-dir $SAVE \
   --arch transformer_iwslt_de_en --share-all-embeddings \
   --dropout 0.1 \

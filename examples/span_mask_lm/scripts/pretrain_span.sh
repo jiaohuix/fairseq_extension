@@ -3,7 +3,7 @@ DATA=$1
 SAVE=$2
 mkdir -p $SAVE
 tokens=${3:-"2048"}
-updates=${4:-"50000"}
+updates=${4:-"15000"}
 density=${5:-"0.15"}
 length=${6:-"3"}
 

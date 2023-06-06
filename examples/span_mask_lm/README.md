@@ -20,6 +20,13 @@ git clone https://github.com/jiaohuix/fairseq_extension.git
 cp -r fairseq_extension/examples/span_mask_lm/  .
 ```
 
+如果是fairseq 1.0.0，没有span相关的代码，需要拷贝data和task：
+
+```
+cp span_mask_lm/scripts/span_mask_tokens_dataset.py fairseq/data/
+cp span_mask_lm/scripts/span_masked_lm.py fairseq/tasks/
+```
+
 
 
 ## 2 数据处理

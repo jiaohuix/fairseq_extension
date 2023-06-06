@@ -20,6 +20,14 @@ git clone https://github.com/jiaohuix/fairseq_extension.git
 cp -r fairseq_extension/examples/bart/  .
 ```
 
+运行pretrain时会报错，需要删除denoise task里面的positions：
+
+```shell
+#argparse.ArgumentError: argument --max-source-positions: conflicting option string: --max-source-positions
+
+cp bart/scripts/denoising.py fairseq/tasks/
+```
+
 
 
 ## 2 数据处理

@@ -14,7 +14,7 @@ fairseq-train --task span_masked_lm --noise-density $density --mean-noise-span-l
   --optimizer adam --adam-betas '(0.9, 0.98)' --weight-decay 0.01 --clip-norm 1.0 \
   --lr 0.0005 --lr-scheduler inverse_sqrt --warmup-updates 4000 --warmup-init-lr 1e-07 \
   --tokens-per-sample 512 --sample-break-mode none \
-  --max-tokens $tokens --update-freq 16 \
+  --max-tokens $tokens --update-freq 4 \
   --fp16 --max-update $updates --no-epoch-checkpoints \
   --criterion label_smoothed_cross_entropy --label-smoothing 0.1 \
   --tensorboard-logdir $SAVE/vislogs/   >> $SAVE/train.log

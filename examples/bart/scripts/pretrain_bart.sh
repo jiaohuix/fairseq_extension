@@ -4,8 +4,10 @@ SAVE=$2
 mkdir -p $SAVE
 tokens=${3:-"2048"}
 updates=${4:-"50000"}
-fairseq-train --task denoising \
-  $DATA  --save-dir $SAVE \
+fairseq-train $DATA  --save-dir $SAVE \
+  --task denoising --max-source-positions 1024 --max-target-positions 1024  \
+  --mask 0.35  --rotate 0.0 --mask-random 0.1 --permute-sentences 1.0 --insert 0.0 \
+  --poisson-lambda 3.5 --mask-length span-poisson --replace-length 1  \
   --arch transformer_iwslt_de_en --share-all-embeddings \
   --dropout 0.1  --max-source-positions 1024 --max-target-positions 1024 --replace-length 1  \
   --optimizer adam --adam-betas '(0.9, 0.98)' --weight-decay 0.01 --clip-norm 1.0 \

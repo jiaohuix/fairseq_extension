@@ -72,7 +72,7 @@ def process(bert_vocab, fairseq_vocab, special_map):
     res_tokens = {}
     unk_tokens = []
     for token, idx in fairseq_vocab.items():
-        res_idx,res_tok = chinese_token_map(token, bert_vocab, special_map)
+        res_idx,res_tok = chinese_token_map(token.replace("@@",""), bert_vocab, special_map)
         res_idxs[str(idx)] = [str(idx) for idx in res_idx]
         res_tokens[token] = res_tok
         if res_tok == ["[UNK]"]:
@@ -92,5 +92,5 @@ if __name__ == '__main__':
     bert_dict = sys.argv[1]
     fairseq_dict = sys.argv[2]
     bert_vocab = load_vocab(bert_dict,add_simple=True)
-    fairseq_vocab = load_vocab(fairseq_dict)
+    fairseq_vocab = load_vocab(fairseq_dict, remove_bpe = False)
     process(bert_vocab,fairseq_vocab,special_map)

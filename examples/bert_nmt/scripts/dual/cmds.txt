@@ -1,0 +1,47 @@
+# ref：https://github.com/gpengzhi/Bi-SimCut
+bash multi_res_data.sh de en iwslt14.tokenized.de-en/ iwslt14_mres
+bash dual_data.sh de en iwslt14.tokenized.de-en/ iwslt14_dual
+# mres 和dual合并
+bash dual_data.sh de en iwslt14_mres iwslt14_mres_dual
+
+# bin
+## 先获取带sep的dict
+bash bin_joint.sh de en iwslt14_mres  data-bin/iwslt14_mres
+## 然后后面都用这个dict
+bash bin_joint_wdict.sh de en iwslt14.tokenized.de-en/  data-bin/iwslt14_deen_uni  data-bin/iwslt14_mres/dict.de.txt
+bash bin_joint_wdict.sh src tgt iwslt14_dual  data-bin/iwslt14_dual     data-bin/iwslt14_mres/dict.de.txt
+bash bin_joint_wdict.sh src tgt iwslt14_mres_dual  data-bin/iwslt14_mres_dual   data-bin/iwslt14_mres/dict.de.txt
+
+# train
+# exp3
+bash dual/train.sh data-bin/iwslt14_mres/  ckpt3/mres
+# exp2
+bash dual/train.sh data-bin/iwslt14_dual/  ckpt3/dual
+bash dual/train_ft.sh data-bin/iwslt14_deen_uni/  ckpt3/dual_ft ckpt3/dual/checkpoint_best.pt
+
+# exp4 $interval 4epoch测试一次（似乎很快，不用interval）
+bash dual/train.sh data-bin/iwslt14_mres_dual/  ckpt3/mres_dual 4
+bash dual/train_ft.sh data-bin/iwslt14_deen_uni/  ckpt3/mres_dual_ft ckpt3/mres_dual/checkpoint_best.pt
+
+
+###### mbert
+bash scripts/bin_bert.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen_mbert15
+
+bash scripts/bin_bert.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen_mbert15 bert/bert-base-15lang-cased/
+bash scripts/bin_bert.sh de en iwslt14.tokenized.de-en data-bin/iwslt14_deen_distbert15 bert/distilbert-base-25lang-cased/
+
+
+
+####### train
+bash scripts/train_bnmt.sh data-bin/iwslt14_deen_mbert15/ ckpt/mbert15_deen bert/bert-base-15lang-cased/
+
+###########bert
+bash scripts/bin_bert.sh src tgt  iwslt14_mres_dual/  data-bin/iwslt14_mres_dual_dis bert/distilbert-base-25lang-cased/
+
+woc 双向好麻烦。
+
+bash scripts/bin_bert.sh src tgt  iwslt14_mres_dual/  data-bin/iwslt14_mres_dual_dis25 bert/distilbert-base-25lang-cased/
+bash scripts/bin_bert.sh src tgt  iwslt14_mres_dual/  data-bin/iwslt14_mres_dual_bert15 bert/bert-base-15lang-cased/
+
+# 给对偶mbert做单向数据
+bash bin_dic.sh de en iwslt14.tokenized.de-en data-bin-uni/dis25 data-bin/iwslt14_mres_dual_dis25/dict.src.txt

@@ -1,0 +1,14 @@
+transformers
+peft
+fastcore
+tensorboardX
+#fairseq==0.12.2
+#torch==2.0.1
+sacremoses
+tensorboardX
+sacrebleu==1.5
+apex
+fastcore
+omegaconf
+jieba
+sentencepiece

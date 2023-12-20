@@ -1,8 +1,13 @@
 # 1.导入decoder，2.修改encoder 3.添加model
 # TODO: 写个encoder,支持bert_input这个参数(criterion在forward时,取了net_input的参数,以**关键字参数传给encoder  )
 # TODO: qblock qformer直接是transformer解码器一层或若干层
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"..")))
+
 import logging
 import math
+
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -32,12 +37,31 @@ from fairseq.modules import (
     SinusoidalPositionalEmbedding,
     transformer_layer,
 )
+from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.distributed import fsdp_wrap
 from transformers import AutoTokenizer, AutoModel
 from typing import Dict, List, Optional
 from fairseq.models.transformer import TransformerConfig
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
+from bnmt.checkpoint_utils import print_trainable_parameters
+
+from peft import (
+    get_peft_config,
+    get_peft_model,
+    get_peft_model_state_dict,
+    set_peft_model_state_dict,
+    LoraConfig,
+    PeftType,
+    PeftConfig,
+    PeftModel,
+)
+from argparse import Namespace
+from omegaconf import DictConfig
+from fairseq.dataclass.utils import (
+    convert_namespace_to_omegaconf,
+    gen_parser_from_dataclass,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +76,9 @@ def module_name_fordropout(module_name: str) -> str:
 
 class QBlock(TransformerDecoderLayerBase):
     def __init__(
-        self, cfg, no_encoder_attn=False, add_bias_kv=False, add_zero_attn=False
+            self, cfg, no_encoder_attn=False, add_bias_kv=False, add_zero_attn=False
     ):
-        super(QBlock,self).__init__(cfg, no_encoder_attn, add_bias_kv, add_zero_attn)
+        super(QBlock, self).__init__(cfg, no_encoder_attn, add_bias_kv, add_zero_attn)
 
     # def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
     #     return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
@@ -89,7 +113,7 @@ class QBlock(TransformerDecoderLayerBase):
             encoder_decoder_attention=True,
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
-            xformers_att_config=cfg.encoder.xformers_att_config,
+            # xformers_att_config=cfg.encoder.xformers_att_config,
         )
 
     # def forward(*args,**kwargs):
@@ -97,17 +121,17 @@ class QBlock(TransformerDecoderLayerBase):
     #     return super().forward(*args,**kwargs)
 
     def forward(
-        self,
-        x,
-        encoder_out: Optional[torch.Tensor] = None,
-        encoder_padding_mask: Optional[torch.Tensor] = None,
-        incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]] = None,
-        prev_self_attn_state: Optional[List[torch.Tensor]] = None,
-        prev_attn_state: Optional[List[torch.Tensor]] = None,
-        self_attn_mask: Optional[torch.Tensor] = None,
-        self_attn_padding_mask: Optional[torch.Tensor] = None,
-        need_attn: bool = False,
-        need_head_weights: bool = False,
+            self,
+            x,
+            encoder_out: Optional[torch.Tensor] = None,
+            encoder_padding_mask: Optional[torch.Tensor] = None,
+            incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]] = None,
+            prev_self_attn_state: Optional[List[torch.Tensor]] = None,
+            prev_attn_state: Optional[List[torch.Tensor]] = None,
+            self_attn_mask: Optional[torch.Tensor] = None,
+            self_attn_padding_mask: Optional[torch.Tensor] = None,
+            need_attn: bool = False,
+            need_head_weights: bool = False,
     ):
         """
         Args:
@@ -140,9 +164,9 @@ class QBlock(TransformerDecoderLayerBase):
             self.self_attn._set_input_buffer(incremental_state, saved_state)
         _self_attn_input_buffer = self.self_attn._get_input_buffer(incremental_state)
         if self.cross_self_attention and not (
-            incremental_state is not None
-            and _self_attn_input_buffer is not None
-            and "prev_key" in _self_attn_input_buffer
+                incremental_state is not None
+                and _self_attn_input_buffer is not None
+                and "prev_key" in _self_attn_input_buffer
         ):
             if self_attn_mask is not None:
                 assert encoder_out is not None
@@ -245,24 +269,6 @@ class QBlock(TransformerDecoderLayerBase):
 
 
 # 参数写一个类。
-def print_trainable_parameters(model):
-    """
-    Prints the number of trainable parameters in the model.
-    """
-    trainable_params = 0
-    all_param = 0
-    for _, param in model.named_parameters():
-        num_params = param.numel()
-        # if using DS Zero 3 and the weights are initialized empty
-        if num_params == 0 and hasattr(param, "ds_numel"):
-            num_params = param.ds_numel
-
-        all_param += num_params
-        if param.requires_grad:
-            trainable_params += num_params
-    print(
-        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
-    )
 
 
 class QFormer(nn.Module):
@@ -290,7 +296,13 @@ class QFormer(nn.Module):
         q_layer_ls = [QBlock(cfg=self.cfg) for _ in range(self.q_layers)]
         self.q_layers = nn.ModuleList(q_layer_ls)
 
-    def forward(self, bert_out, bert_pad_mask=None): #
+        ## ffn
+        self.fc = nn.Linear(self.nmt_dim,self.nmt_dim)
+        self.drop = FairseqDropout(cfg.dropout, module_name=self.__class__.__name__)
+        self.layernorm = LayerNorm(self.nmt_dim)
+        self.use_q_fc = False
+
+    def forward(self, bert_out, bert_pad_mask=None):  #
         # x: bert输出
         bsz = bert_out.shape[0]
         x = torch.arange(0, self.n_query).unsqueeze(0).expand(bsz, -1)
@@ -301,13 +313,22 @@ class QFormer(nn.Module):
         bert_out = bert_out.transpose(0, 1)
         # input encoder_out encoder_pad
         for q_layer in self.q_layers:
-            out = q_layer(q, bert_out, bert_pad_mask) # x,encoder_out,encoder_padding_mask
+            out = q_layer(q, bert_out, bert_pad_mask)  # x,encoder_out,encoder_padding_mask
             q = out[0]
         q = q.transpose(0, 1)
 
-        # if self.ffn is not None:
-        #     q = self.ffn(q)
+        if self.fc is not None and self.use_q_fc:
+            residual = q
+            q = self.fc(q)
+            q = self.drop(q)
+            q = self.residual_connection(q, residual)
+            q = self.layernorm(q)
+
         return q
+
+    def residual_connection(self, x, residual):
+        return residual + x
+
 
 
 class BertNMTEncoder(TransformerEncoderBase):
@@ -321,23 +342,61 @@ class BertNMTEncoder(TransformerEncoderBase):
         embed_tokens (torch.nn.Embedding): input embedding
     """
 
+    def load_bert_lora(self, lora_dir=None):
+        if lora_dir is not None:
+            adapter_path = os.path.join(lora_dir, "adapter_model.bin")
+            if not os.path.exists(adapter_path):
+                lora_dir = None
+        cfg = self.cfg
+        logger.info(f"self.bert_encoder type {type(self.bert_encoder)}")
+        if cfg.use_lora:
+            # https://github.com/huggingface/peft/issues/219,  when use lora, remove "task_type"
+            # peft_config = LoraConfig(task_type=args.lora_task_type, inference_mode=False, r=args.lora_rank,
+            # todo修改：之前分train test，现在有权重就加载
+            if lora_dir is None:
+                logger.info("Loading lora weights scratch......")
+                peft_config = LoraConfig(inference_mode=False, r=cfg.lora_rank,
+                                         lora_alpha=cfg.lora_alpha, lora_dropout=cfg.lora_dropout,
+                                         target_modules=["q_lin", "v_lin", "query", "value"])
+                self.bert_encoder = get_peft_model(self.bert_encoder, peft_config)
+                logger.info(f"self.bert_encoder type {type(self.bert_encoder)}")
+                print_trainable_parameters(self.bert_encoder)
+                # self.peft_config = peft_config
+            else:
+                logger.info(f"Loading lora weights from file: {lora_dir}......")
+                self.bert_encoder = PeftModel.from_pretrained(self.bert_encoder, lora_dir, is_trainable=False)
+                self.bert_encoder.merge_and_unload()
+                print_trainable_parameters(self.bert_encoder)
+
+        else:
+            logger.info("do not use lora")
+            pass
+
+            # self.peft_config = None
+        # 推理时候需要从文件加载
+
     def __init__(self, cfg, dictionary, embed_tokens, return_fc=False):
         super().__init__(cfg, dictionary, embed_tokens, return_fc=return_fc)
 
         # bert encoder
-        self.bert_tokenizer = AutoTokenizer.from_pretrained(cfg.bert_model_name)
+        try:
+            self.bert_tokenizer = AutoTokenizer.from_pretrained(cfg.bert_model_name)
+        except:
+            from transformers import BertTokenizer
+            self.bert_tokenizer = BertTokenizer.from_pretrained(cfg.bert_model_name)
+
         self.bert_encoder = AutoModel.from_pretrained(cfg.bert_model_name)
         self.bert_out_dim = self.bert_encoder.config.hidden_size
         for param in self.bert_encoder.parameters():
             param.requires_grad = False
         print_trainable_parameters(self.bert_encoder)
-        # lora...
 
         # qformer
         self.qformer = QFormer(cfg)
 
     def forward_bert(self, bert_input):
-        if bert_input is None: return bert_input,None
+
+        if bert_input is None: return bert_input, None
         # 1. forward bert
         bert_pad_id = self.bert_tokenizer.convert_tokens_to_ids(self.bert_tokenizer.pad_token)
         bert_cls_id = self.bert_tokenizer.convert_tokens_to_ids(self.bert_tokenizer.cls_token)
@@ -359,6 +418,44 @@ class BertNMTEncoder(TransformerEncoderBase):
         fused_embed = torch.cat([nmt_embed, q_embed], dim=1)  # [bsz,nmt_len,dim]->[bsz,nmt_len+n_query, dim]
         return fused_embed
 
+    # 直接把nmt的token embed和bert的拼接会有巨大的问题，范数都不一样。
+    # def forward_embedding(
+    #         self, src_tokens, token_embedding: Optional[torch.Tensor] = None, bert_input=None,
+    # ):
+    #     ''' 需要获取bert输入 ,
+    #     bug：bert输出还需要位置编码么？ 答：要的，参考bibert：https://github.com/fe1ixxu/BiBERT/blob/master/fairseq/models/transformer.py#L391
+    #     src_tokens->token_embed （应该在这融合吧）->scale-> +pos_embed
+    #     '''
+    #     # embed tokens and positions
+    #     if token_embedding is None:
+    #         token_embedding = self.embed_tokens(src_tokens)
+    #         # 拼接bert
+    #         if bert_input is not None:
+    #             bert_out, bert_encoder_padding_mask = self.forward_bert(bert_input)
+    #             token_embedding = self.fuse_embedding(nmt_embed=token_embedding,
+    #                                                   bert_embed=bert_out,
+    #                                                   bert_pad_mask=bert_encoder_padding_mask)
+
+    #     x = embed = self.embed_scale * token_embedding
+    #     if self.embed_positions is not None: # 注意拼接bert后的长度
+    #         if bert_input is None:
+    #             x = embed + self.embed_positions(src_tokens)
+    #         else:
+    #             bsz, nmt_len = src_tokens.size()
+    #             query_tokens = torch.full([bsz, self.cfg.n_query], fill_value=-1).to(device=src_tokens.device)
+    #             fake_tokens = torch.cat([src_tokens, query_tokens], dim=1)
+
+    #             x = embed + self.embed_positions(fake_tokens)
+
+    #     # 其实最好layernorm一下
+    #     if self.layernorm_embedding is not None:
+    #         x = self.layernorm_embedding(x)
+    #     x = self.dropout_module(x)
+    #     if self.quant_noise is not None:
+    #         x = self.quant_noise(x)
+
+    #     return x, embed
+
     def forward_embedding(
             self, src_tokens, bert_input=None, token_embedding: Optional[torch.Tensor] = None
     ):
@@ -372,7 +469,7 @@ class BertNMTEncoder(TransformerEncoderBase):
 
         ### BERT EMBED ###
         if bert_input is not None:
-            bert_out,bert_encoder_padding_mask = self.forward_bert(bert_input)
+            bert_out, bert_encoder_padding_mask = self.forward_bert(bert_input)
             x = self.fuse_embedding(nmt_embed=x, bert_embed=bert_out, bert_pad_mask=bert_encoder_padding_mask)
             embed = self.fuse_embedding(nmt_embed=embed, bert_embed=bert_out, bert_pad_mask=bert_encoder_padding_mask)
 
@@ -412,7 +509,8 @@ class BertNMTEncoder(TransformerEncoderBase):
             token_embeddings: Optional[torch.Tensor] = None,
     ):
         # 1.先计算embed， 2.再拼接src_tok， 3.再获取pad mask
-        x, encoder_embedding = self.forward_embedding(src_tokens,bert_input, token_embeddings) # [b, t+n_query, c]
+        x, encoder_embedding = self.forward_embedding(src_tokens, token_embedding=token_embeddings,
+                                                      bert_input=bert_input)  # [b, t+n_query, c]
 
         # 先拼接tokens，再获取mask
         if bert_input is not None:  # 修改tokens,拼接到右侧;修改长度
@@ -473,8 +571,9 @@ class BertNMTEncoder(TransformerEncoderBase):
             src_tokens = src_tokens[:, :- n_query]  # [B T]
             encoder_padding_mask = src_tokens.eq(self.padding_idx)  # 这个padding mask应该放到后面啊
             encoder_embedding = encoder_embedding[:, :-n_query, :]
-            encoder_states = [state[:- n_query,:,:] for state in encoder_states if state is not None] # List[T x B x C]
-            fc_results = [fc[:- n_query,:,:] for fc in fc_results if fc is not None] # List[T x B x C]
+            encoder_states = [state[:- n_query, :, :] for state in encoder_states if
+                              state is not None]  # List[T x B x C]
+            fc_results = [fc[:- n_query, :, :] for fc in fc_results if fc is not None]  # List[T x B x C]
 
         # The Pytorch Mobile lite interpreter does not supports returning NamedTuple in
         # `forward` so we use a dictionary instead.
@@ -512,12 +611,17 @@ class BertNMTModel(TransformerModel):
         parser.add_argument('--q-drop', default=0., type=float)
         parser.add_argument('--del-top-qtok', action='store_true')  # 删除顶层n_query个用完的query tokens
 
+        ## freeze
+        parser.add_argument('--freeze-nmt', action='store_true')  # 冻结除了bert、qformer以外的参数
+
         ######## LoRA Config ########
-        # parser.add_argument('--use-lora', action='store_true', )
-        # # parser.add_argument('--lora-task-type', default="SEQ_CLS",type=str, help="task_type, [SEQ_CLS/TOKEN_CLS/SEQ_CLS]")
-        # parser.add_argument('--lora-rank', default=8, type=int, help="lora rank")
-        # parser.add_argument('--lora-alpha', default=16, type=int, help="lora alpha")
-        # parser.add_argument('--lora-dropout', default=0.1, type=float, help="lora dropout")
+        parser.add_argument('--use-lora', action='store_true', )
+        # parser.add_argument('--lora-task-type', default="SEQ_CLS",type=str, help="task_type, [SEQ_CLS/TOKEN_CLS/SEQ_CLS]")
+        parser.add_argument('--lora-rank', default=8, type=int, help="lora rank")
+        parser.add_argument('--lora-alpha', default=16, type=int, help="lora alpha")
+        parser.add_argument('--lora-dropout', default=0.1, type=float, help="lora dropout")
+        parser.add_argument('--lora-dir', default="loras", type=str, help="lora folder")  # 加载save_dir/lora_dir
+
         gen_parser_from_dataclass(
             parser, TransformerConfig(), delete_default=True, with_prefix=""
         )
@@ -562,6 +666,33 @@ class BertNMTModel(TransformerModel):
         )
         return decoder_out
 
+    def load_state_dict(
+            self,
+            state_dict,
+            strict=True,
+            model_cfg: Optional[DictConfig] = None,
+            args: Optional[Namespace] = None,
+    ):
+        """Copies parameters and buffers from *state_dict* into this module and
+        its descendants.
+
+        Overrides the method in :class:`nn.Module`. Compared with that method
+        this additionally "upgrades" *state_dicts* from old checkpoints.
+        """
+        strict = False
+        if model_cfg is None and args is not None:
+            logger.warn(
+                "using 'args' is deprecated, please update your code to use dataclass config"
+            )
+            model_cfg = convert_namespace_to_omegaconf(args).model
+
+        self.upgrade_state_dict(state_dict)
+
+        from fairseq.checkpoint_utils import prune_state_dict
+
+        new_state_dict = prune_state_dict(state_dict, model_cfg)
+        return super().load_state_dict(new_state_dict, strict)
+
 
 @register_model_architecture("bert_nmt_qblock", "bert_nmt_qb")
 def bnmt_base_arch(args):
@@ -573,13 +704,15 @@ def bnmt_base_arch(args):
     args.q_ffn = getattr(args, "q_ffn", False)
     args.q_drop = getattr(args, "q_drop", 0.)
     args.del_top_qtok = getattr(args, "del_top_qtok", False)
+    args.freeze_nmt = getattr(args, "freeze_nmt", False)
 
     # lora
-    # args.use_lora = getattr(args, "use_lora", False)
-    # args.lora_task_type = getattr(args, "lora_task_type", "SEQ_CLS")
-    # args.lora_rank = getattr(args, "lora_rank", 18)
-    # args.lora_alpha = getattr(args, "lora_alpha", 16)
-    # args.lora_dropout = getattr(args, "lora_dropout", 0.1)
+    args.use_lora = getattr(args, "use_lora", False)
+    args.lora_rank = getattr(args, "lora_rank", 8)
+    args.lora_alpha = getattr(args, "lora_alpha", 16)
+    args.lora_dropout = getattr(args, "lora_dropout", 0.1)
+    args.lora_dir = getattr(args, "lora_dir", "loras")
+
     base_architecture(args)
 
 
@@ -594,6 +727,3 @@ def bnmt_iwslt_de_en(args):
     args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 4)
     args.decoder_layers = getattr(args, 'decoder_layers', 6)
     bnmt_base_arch(args)
-
-
-

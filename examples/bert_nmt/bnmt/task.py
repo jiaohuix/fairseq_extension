@@ -162,7 +162,11 @@ def load_bert_nmt_dataset(
             )
 
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
-    berttokenizer = AutoTokenizer.from_pretrained(bert_model_name)
+    try:
+        berttokenizer = AutoTokenizer.from_pretrained(bert_model_name)
+    except:
+        from transformers import BertTokenizer
+        berttokenizer = BertTokenizer.from_pretrained(bert_model_name)
     return LanguageTripleDataset(
         src_dataset,
         src_dataset.sizes,

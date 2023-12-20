@@ -1,0 +1,114 @@
+######## 1. sentence piece subword ##############
+
+# learn
+
+# apply
+## 疑问？spm前中文要不要jieba？？
+## 不用jieba
+python scripts/spm_encode.py --model nllb_model/flores200_sacrebleu_tokenizer_spm.model --output_format=piece --inputs=datasets/zh_ar/train.zh --outputs=datasets/zhar_piece/train.spm.zh
+python scripts/spm_encode.py --model nllb_model/flores200_sacrebleu_tokenizer_spm.model --output_format=piece --inputs=datasets/zh_ar/train.ar --outputs=datasets/zhar_piece/train.spm.ar
+
+python nllb_scripts/check_tokenization_rate.py datasets/zhar_piece/train.spm.zh
+python nllb_scripts/check_tokenization_rate.py datasets/zhar_piece/train.spm.ar
+# tokenization rate: 14.62586
+
+## 用jieba X
+python nllb_scripts/cut_multi.py datasets/zh_ar/train.zh datasets/zh_ar/train.tok.zh 4 zh
+python scripts/spm_encode.py --model nllb_model/flores200_sacrebleu_tokenizer_spm.model --output_format=piece --inputs=datasets/zh_ar/train.tok.zh --outputs=datasets/zhar_piece/train.tok.spm.zh
+
+python nllb_scripts/check_tokenization_rate.py datasets/zhar_piece/train.tok.spm.zh
+# tokenization rate: 20.3513
+
+# decode
+
+
+######## 2.huggingface tokenize  arb_Arab zho_Hans ########
+# 1.no jieba  [与直接用spm完全一样！！！]
+python nllb_scripts/nllb_tokenize_zhar.py datasets/zh_ar/train.zh datasets/zhar_hug/train.zh 4 zho_Hans
+python nllb_scripts/nllb_tokenize_zhar.py datasets/zh_ar/train.ar datasets/zhar_hug/train.ar 4 arb_Arab
+python nllb_scripts/check_tokenization_rate.py  datasets/zhar_hug/train.zh
+python nllb_scripts/check_tokenization_rate.py  datasets/zhar_hug/train.AR
+# tokenization rate: 14.62576
+
+# 2.with jieba XXXXXX
+
+
+## tokenization rate
+
+
+
+####### 3.mrasp tokenize
+subword-nmt apply-bpe -c nllb_scripts/codes.bpe.32000.txt <datasets/zh_ar/train.tok.zh>  datasets/zhar_bpe/train.bpe.zh
+subword-nmt apply-bpe -c nllb_scripts/codes.bpe.32000.txt <datasets/zh_ar/train.ar >  datasets/zhar_bpe/train.bpe.ar
+python nllb_scripts/check_tokenization_rate.py  datasets/zhar_bpe/train.bpe.zh # tokenization rate: 16.33536
+python nllb_scripts/check_tokenization_rate.py  datasets/zhar_bpe/train.bpe.ar # tokenization rate: 21.19474
+
+
+
+
+python nllb_scripts/run_nllb.py  arb_Arab zho_Hans   "حاول أن تقوم بالتركيز على العينين بالتبادل بدلاً من التركيز على إحدى العينين دون الأخرى ."
+## 测试字典没有 鸡 能不能翻译出chicken？
+python nllb_scripts/run_nllb.py  zho_Hans   eng_Latn "我喜欢吃鸡"
+
+
+有没有中阿 阿中方向？？
+arb_Arab-zho_Hans
+zho_Hans-arb_Arab
+英： eng_Latn
+词汇量： 255997+4
+mask_token = <mask>
+# 202个
+additional_special_tokens = ['ace_Arab', 'ace_Latn', 'acm_Arab', 'acq_Arab', 'aeb_Arab', 'afr_Latn', 'ajp_Arab', 'aka_Latn', 'amh_Ethi', 'apc_Arab', 'arb_Arab', 'ars_Arab', 'ary_Arab', 'arz_Arab', 'asm_Beng', 'ast_Latn', 'awa_Deva', 'ayr_Latn', 'azb_Arab', 'azj_Latn', 'bak_Cyrl', 'bam_Latn', 'ban_Latn', 'bel_Cyrl', 'bem_Latn', 'ben_Beng', 'bho_Deva', 'bjn_Arab', 'bjn_Latn', 'bod_Tibt', 'bos_Latn', 'bug_Latn', 'bul_Cyrl', 'cat_Latn', 'ceb_Latn', 'ces_Latn', 'cjk_Latn', 'ckb_Arab', 'crh_Latn', 'cym_Latn', 'dan_Latn', 'deu_Latn', 'dik_Latn', 'dyu_Latn', 'dzo_Tibt', 'ell_Grek', 'eng_Latn', 'epo_Latn', 'est_Latn', 'eus_Latn', 'ewe_Latn', 'fao_Latn', 'pes_Arab', 'fij_Latn', 'fin_Latn', 'fon_Latn', 'fra_Latn', 'fur_Latn', 'fuv_Latn', 'gla_Latn', 'gle_Latn', 'glg_Latn', 'grn_Latn', 'guj_Gujr', 'hat_Latn', 'hau_Latn', 'heb_Hebr', 'hin_Deva', 'hne_Deva', 'hrv_Latn', 'hun_Latn', 'hye_Armn', 'ibo_Latn', 'ilo_Latn', 'ind_Latn', 'isl_Latn', 'ita_Latn', 'jav_Latn', 'jpn_Jpan', 'kab_Latn', 'kac_Latn', 'kam_Latn', 'kan_Knda', 'kas_Arab', 'kas_Deva', 'kat_Geor', 'knc_Arab', 'knc_Latn', 'kaz_Cyrl', 'kbp_Latn', 'kea_Latn', 'khm_Khmr', 'kik_Latn', 'kin_Latn', 'kir_Cyrl', 'kmb_Latn', 'kon_Latn', 'kor_Hang', 'kmr_Latn', 'lao_Laoo', 'lvs_Latn', 'lij_Latn', 'lim_Latn', 'lin_Latn', 'lit_Latn', 'lmo_Latn', 'ltg_Latn', 'ltz_Latn', 'lua_Latn', 'lug_Latn', 'luo_Latn', 'lus_Latn', 'mag_Deva', 'mai_Deva', 'mal_Mlym', 'mar_Deva', 'min_Latn', 'mkd_Cyrl', 'plt_Latn', 'mlt_Latn', 'mni_Beng', 'khk_Cyrl', 'mos_Latn', 'mri_Latn', 'zsm_Latn', 'mya_Mymr', 'nld_Latn', 'nno_Latn', 'nob_Latn', 'npi_Deva', 'nso_Latn', 'nus_Latn', 'nya_Latn', 'oci_Latn', 'gaz_Latn', 'ory_Orya', 'pag_Latn', 'pan_Guru', 'pap_Latn', 'pol_Latn', 'por_Latn', 'prs_Arab', 'pbt_Arab', 'quy_Latn', 'ron_Latn', 'run_Latn', 'rus_Cyrl', 'sag_Latn', 'san_Deva', 'sat_Beng', 'scn_Latn', 'shn_Mymr', 'sin_Sinh', 'slk_Latn', 'slv_Latn', 'smo_Latn', 'sna_Latn', 'snd_Arab', 'som_Latn', 'sot_Latn', 'spa_Latn', 'als_Latn', 'srd_Latn', 'srp_Cyrl', 'ssw_Latn', 'sun_Latn', 'swe_Latn', 'swh_Latn', 'szl_Latn', 'tam_Taml', 'tat_Cyrl', 'tel_Telu', 'tgk_Cyrl', 'tgl_Latn', 'tha_Thai', 'tir_Ethi', 'taq_Latn', 'taq_Tfng', 'tpi_Latn', 'tsn_Latn', 'tso_Latn', 'tuk_Latn', 'tum_Latn', 'tur_Latn', 'twi_Latn', 'tzm_Tfng', 'uig_Arab', 'ukr_Cyrl', 'umb_Latn', 'urd_Arab', 'uzn_Latn', 'vec_Latn', 'vie_Latn', 'war_Latn', 'wol_Latn', 'xho_Latn', 'ydd_Hebr', 'yor_Latn', 'yue_Hant', 'zho_Hans', 'zho_Hant', 'zul_Latn']
+ 255997+4+1+202 = 256204 < 256206, 怎么少了两个
+print(tokenizer.vocab_size,"vsize") # 256204 ,就是少了俩，可能pad到了8xxx
+
+bos_token="<s>",
+eos_token="</s>",
+sep_token="</s>",
+cls_token="<s>",
+unk_token="<unk>",
+pad_token="<pad>",
+mask_token="<mask>",
+
+
+# finetune nllb
+defaults:
+  - default
+
+dataset_name: "bilingual"
+num_shards: 1
+langs: zho_Hans,arb_Arab
+lang_pairs: zho_Hans-arb_Arab
+data_prefix:
+  example: data-bin/zhar
+
+
+DATA_CONFIG=examples/nllb/modeling/train/conf/cfg/dataset/bilingual.yaml
+SRC=zh
+TGT=ar
+OUTPUT_DIR=ckpt/zhar
+DROP=0.1
+MODEL_FOLDER=nllb6m
+
+python examples/nllb/modeling/train/train_script.py \
+    cfg=nllb200_dense3.3B_finetune_on_fbseed \
+    cfg/dataset=$DATA_CONFIG \
+    cfg.dataset.lang_pairs="$SRC-$TGT" \
+    cfg.fairseq_root=$(pwd) \
+    cfg.output_dir=$OUTPUT_DIR \
+    cfg.dropout=$DROP \
+    cfg.warmup=10 \
+    cfg.finetune_from_model=$MODEL_FOLDER/checkpoint.pt
+
+
+https://tinyurl.com/flores200sacrebleuspm
+https://tinyurl.com/nllb200dictionary
+
+python scripts/spm_encode.py --model nllb/flores200sacrebleuspm --output_format=piece --inputs=zhar5w/train.zh --outputs=zhar5w/train.spm.zh
+@register_grid("transformer_12_12")
+def get_transformer_12_12_grid():
+
+
+
+zho_Hans 256200  √
+arb_Arab 256011  √

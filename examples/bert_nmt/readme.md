@@ -5,6 +5,8 @@
 ## 环境安装
 
 ```shell
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+
 git config --global url."https://huggingface.co/".insteadOf "https://hf-mirror.com/"
 
 pip install --editable ./ -i https://pypi.tuna.tsinghua.edu.cn/simple

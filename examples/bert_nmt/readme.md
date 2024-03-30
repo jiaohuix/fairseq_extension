@@ -5,8 +5,10 @@
 ## 环境安装
 
 ```shell
+git config --global url."https://huggingface.co/".insteadOf "https://hf-mirror.com/"
+
 pip install --editable ./ -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install sacremoses tensorboardX   sacrebleu==1.5 apex     fastcore omegaconf jieba  sentencepiece -i https://pypi.tuna.tsinghua.edu.cn/simple/
+pip install sacremoses tensorboardX   sacrebleu==1.5 apex transformers peft fairseq==0.12.2    fastcore omegaconf jieba  sentencepiece -i https://pypi.tuna.tsinghua.edu.cn/simple/
 ```
 
 目录：
@@ -26,6 +28,7 @@ https://huggingface.co/Geotrend/bert-base-15lang-cased
 https://huggingface.co/Geotrend/distilbert-base-25lang-cased
 dbmdz
 git lfs clone https://huggingface.co/dbmdz/bert-base-german-uncased
+git lfs clone https://hf-mirror.com/susnato/ernie-m-base_pytorch
 
 
 

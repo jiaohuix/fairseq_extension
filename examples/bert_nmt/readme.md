@@ -84,7 +84,7 @@ bash scripts/train_bnmt.sh data-bin/iwslt14_dbmdz/ ckpt/dbmdz
 # 基线
 bash scripts/eval.sh data-bin/iwslt14_dbmdz/ ckpt/base/checkpoint_best.pt
 # bert
-bash scripts/eval_bnmt.sh data-bin/iwslt14_dbmdz/ ckpt/dbmdz/checkpoint_best.pt
+bash scripts/eval_bnmt.sh de en data-bin/iwslt14_dbmdz/ ckpt/dbmdz/checkpoint_best.pt
 ```
 
 ## 实验1

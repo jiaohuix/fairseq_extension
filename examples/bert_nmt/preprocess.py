@@ -72,13 +72,26 @@ from fairseq.binarizer import (
 )
 from fairseq.data import Dictionary
 from transformers import PreTrainedTokenizer, AutoTokenizer, BertTokenizer, \
-    BertTokenizerFast, XLMRobertaTokenizerFast, RobertaTokenizerFast, DebertaV2TokenizerFast, DistilBertTokenizerFast
+    BertTokenizerFast, XLMRobertaTokenizerFast, RobertaTokenizerFast, DebertaV2TokenizerFast, DistilBertTokenizerFast,ErnieMTokenizer
 from fastcore.all import patch_to, partial
 from fairseq.tokenizer import tokenize_line
 
 BERT_CLS = (
     PreTrainedTokenizer, AutoTokenizer, BertTokenizer, BertTokenizerFast, XLMRobertaTokenizerFast, RobertaTokenizerFast,
-    DebertaV2TokenizerFast, DistilBertTokenizerFast)
+    DebertaV2TokenizerFast, DistilBertTokenizerFast,ErnieMTokenizer)
+
+@patch_to(ErnieMTokenizer)
+def encode_line(
+        self,
+        line,
+        line_tokenizer=tokenize_line,
+        add_if_not_exist=True,
+        consumer=None,
+        append_eos=False,
+        reverse_order=False,
+) -> torch.IntTensor:
+    ids = self.__call__(line, return_tensors='pt')["input_ids"]
+    return ids
 
 
 @patch_to(BertTokenizerFast)

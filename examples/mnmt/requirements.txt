@@ -1,0 +1,6 @@
+sacremoses
+#subword-nmt
+datasets
+tokenizers
+jieba
+pythainlp

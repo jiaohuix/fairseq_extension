@@ -4,7 +4,7 @@ if [ $# -lt 5 ];then
   exit
 fi
 
-src=$1
+src=$1 # 用于记录实验的run name
 tgt=$2
 data=$3
 save=$4
@@ -19,7 +19,7 @@ export WANDB_NAME=$wandb_run_name
 # --max-update 100000
 epochs=20
 mkdir -p $save
-CUDA_VISIBLE_DEVICES=0 fairseq-train --fp16 -s $src -t $tgt \
+CUDA_VISIBLE_DEVICES=0 fairseq-train --fp16 -s src -t tgt \
     $data  --save-dir $save --max-epoch $epochs \
     --arch $arch --share-all-embeddings \
     --reset-optimizer --reset-meters --reset-dataloader --reset-lr-scheduler --restore-file $ckpt  \

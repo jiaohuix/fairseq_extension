@@ -16,5 +16,5 @@ EOF
 
 
 export HF_ENDPOINT=https://hf-mirror.com
-pip install sacremoses tensorboardX  sacrebleu==1.5 apex transformers peft fairseq==0.12.2   subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb
+pip install sacremoses tensorboardX  sacrebleu==1.5 apex fairseq==0.10.0 numpy==1.23.3  subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt -i https://pypi.tuna.tsinghua.edu.cn/simple
 

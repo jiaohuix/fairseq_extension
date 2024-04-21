@@ -15,7 +15,9 @@ scripts/
 
 ```shell
 # touch==2.0.0
-bash scripts/env.sh
+#bash scripts/env.sh
+pip install sacremoses tensorboardX  sacrebleu==1.5 apex fairseq==0.10.0 numpy==1.23.3  subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
 ```
 
 

@@ -1,10 +1,9 @@
 # 训练一种语言
-dataset=datasets/iwslt2017
+dataset=iwslt2017
 wandb_proj=iwslt2017
 data_outdir=train_data
 # lang_pairs=( "it-en" "en-it" "ro-en"  "en-ro" "nl-en" "en-nl"  "it-ro" "ro-it")
-# lang_pairs=("it-en" "en-it"  "ro-en"  "en-ro" )
-# dual_lang_pairs=( "it-en" "ro-en")
+# dual_lang_pairs=( "it-en" "ro-en" "nl-en" "it-ro")
 
 
 lang_pairs=("it-en" "en-it" )
@@ -25,12 +24,12 @@ do
 
     echo "Source language: $src_lang"
     echo "Target language: $tgt_lang"
-
+    
     data_bin_dir=data-bin/${wandb_proj}_dual/${lang_pair}
     ckpt_dir=ckpt/${wandb_proj}_dual/${lang_pair}
     mkdir -p $ckpt_dir
 
-    bash scripts/train.sh src tgt $data_bin_dir $ckpt_dir $wandb_proj 
+    bash scripts/train.sh $src_lang  $tgt_lang $data_bin_dir $ckpt_dir $wandb_proj 
 
     # todo : 评估两个语向
 
@@ -83,8 +82,8 @@ do
     # data_bin_dir=data-bin/${wandb_proj}/${lang_pair}
     # ckpt_dir=ckpt/${wandb_proj}/${lang_pair}
 
-    bash scripts/train_ft.sh src tgt $data_bin_fwd $ckpt_dir_fwd  $ckpt $wandb_proj 
-    bash scripts/train_ft.sh src tgt $data_bin_bwd $ckpt_dir_bwd  $ckpt $wandb_proj 
+    bash scripts/train_ft.sh $src_lang  $tgt_lang $data_bin_fwd $ckpt_dir_fwd  $ckpt $wandb_proj 
+    bash scripts/train_ft.sh $src_lang  $tgt_lang $data_bin_bwd $ckpt_dir_bwd  $ckpt $wandb_proj 
 
     # todo : 评估两个语向
     bash scripts/eval.sh src tgt $data_bin_fwd $ckpt_dir_fwd/checkpoint_best.pt >  $ckpt_dir_fwd/gen_${lang_pair}.txt

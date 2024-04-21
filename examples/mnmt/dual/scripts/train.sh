@@ -18,7 +18,7 @@ export WANDB_NAME=$wandb_run_name
 
 epochs=150
 mkdir -p $save
-CUDA_VISIBLE_DEVICES=0 fairseq-train --fp16 -s $src -t $tgt \
+CUDA_VISIBLE_DEVICES=0 fairseq-train --fp16 -s src -t tgt \
     $data  --save-dir $save --max-epoch $epochs \
     --arch $arch --share-all-embeddings \
     --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 \

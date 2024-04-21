@@ -72,3 +72,10 @@ sed -i '50s#.*#REPO_URL = ""#' iwslt2017/iwslt2017.py
 bash scripts/pipe.sh
 ```
 
+
+
+| model    | it-en | en-it | ro-en | en-ro | nl-en | en-nl | it-ro | ro-it | avg  |
+| -------- | :---- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ---- |
+| uniTrans | 29.76 | 26.02 | 31.31 | 23.96 | 32.95 | 27.64 | 17.22 | 18.45 |      |
+|          |       |       |       |       |       |       |       |       |      |
+

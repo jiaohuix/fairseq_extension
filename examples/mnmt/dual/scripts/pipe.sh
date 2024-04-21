@@ -106,7 +106,7 @@ do
         hypo_file=$report_dir/${tgt_lang}_${src_lang}.rst
         cat $ckpt_dir_bwd/gen_${reverse_pair}.txt | grep -P "^D" | sort -V | cut -f 3- > $hypo_file
         score=$(tail "$ckpt_dir_bwd/gen_${reverse_pair}.txt" | sed "s/,//" | grep "BLEU" | cut -d' ' -f7)
-        ref_len=$(wc -l < $data_outdir/${wandb_proj}/$lang_pair/test.${tgt_lang})
+        ref_len=$(wc -l < $data_outdir/${wandb_proj}/$reverse_pair/test.${tgt_lang})
         hypo_len=$(wc -l < $hypo_file)
         echo "$reverse_pair,$score,$ref_len,$hypo_len" >> $report_dir/bleu.txt
     fi

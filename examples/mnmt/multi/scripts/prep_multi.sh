@@ -51,7 +51,7 @@ do
 
 done
 
-# 2 合并双向/多向
+# # 2 合并双向/多向
 echo "------------step2: process merge data------------"
 train_multi_dir=$data_outdir/${wandb_proj}_multi/
 mkdir -p $train_multi_dir
@@ -91,23 +91,30 @@ bash scripts/bin.sh  $train_multi_dir  $data_bin_multi_dir  src tgt 1
 
 for lang_pair in "${dual_lang_pairs[@]}"
 do
-
+    echo "lang_pair: $lang_pair"
+    src_lang=$(echo "$lang_pair" | cut -d'-' -f1)
+    tgt_lang=$(echo "$lang_pair" | cut -d'-' -f2)
+    reverse_pair=${tgt_lang}-${src_lang}
     # 双向
+    echo "lang_pair: $lang_pair dual"
     train_dual_dir=$data_outdir/${wandb_proj}_dual/$lang_pair
     data_bin_dual_dir=data-bin/${wandb_proj}_dual/${lang_pair} 
     echo "dic:  $data_bin_multi_dir/dict.src.txt"
-    wc  $data_bin_multi_dir/dict.src.txt
     bash scripts/bin.sh  $train_dual_dir  $data_bin_dual_dir  src tgt 1 $data_bin_multi_dir/dict.src.txt
     
     # 单向
+    echo "lang_pair: $lang_pair uni"
     train_data_dir=$data_outdir/$wandb_proj/$lang_pair
     data_bin_dir=data-bin/${wandb_proj}/${lang_pair} 
     bash scripts/bin.sh  $train_data_dir  $data_bin_dir  src tgt 1  $data_bin_multi_dir/dict.src.txt
 
+    echo "lang_pair: $reverse_pair uni"
     train_data_dir=$data_outdir/$wandb_proj/$reverse_pair
     data_bin_dir=data-bin/${wandb_proj}/${reverse_pair} 
     bash scripts/bin.sh  $train_data_dir  $data_bin_dir  src tgt 1  $data_bin_multi_dir/dict.src.txt
 done
+
+
 
 
 

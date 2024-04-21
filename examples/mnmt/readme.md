@@ -6,7 +6,7 @@ iwslt17   ikcest22
 模型：
 
 - [x] 1 单向transformer： baseline
-- [ ] 2 双向transformer
+- [ ] 2 双向transformer： dual
 - [ ] 3 m-transformer
 - [ ] 4 m2m(多语言微调+双向微调+单向微调)
 - [ ] 5 mrasp2微调

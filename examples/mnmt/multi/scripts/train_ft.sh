@@ -4,7 +4,7 @@ if [ $# -lt 5 ];then
   exit
 fi
 
-src=$1 # 用于记录实验的run name
+src=$1
 tgt=$2
 data=$3
 save=$4
@@ -12,7 +12,7 @@ ckpt=$5
 arch=transformer
 lang_pair=${src}-${tgt}
 wandb_project=${6:-"ikcest22"}
-wandb_run_name=dualFtTransformer-${src}-${tgt}
+wandb_run_name=mTransformer-ft-${src}-${tgt}
 
 export WANDB_NAME=$wandb_run_name
 
@@ -34,4 +34,5 @@ CUDA_VISIBLE_DEVICES=0 fairseq-train --fp16 -s src -t tgt \
 
 
 
+# 
 # --keep-best-checkpoints 1  --wandb-run-name $wandb_run_name  

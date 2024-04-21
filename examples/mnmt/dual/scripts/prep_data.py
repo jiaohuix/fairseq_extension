@@ -138,15 +138,15 @@ calculate_statics(dataset)
 print(dataset)
 
 ## 2 学习truecase
-tokenized_corpus = []
-truecase_langs = ["en", "fr", "ru", "it", "ro", "nl", "de"]
+# tokenized_corpus = []
+# truecase_langs = ["en", "fr", "ru", "it", "ro", "nl", "de"]
 
-for split in splits:
-    dataset_split = dataset[split]
-    if src_lang in truecase_langs:
-        tokenized_corpus.extend(dataset_split[src_lang])
-    if tgt_lang in truecase_langs:
-        tokenized_corpus.extend(dataset_split[tgt_lang])
+# for split in splits:
+#     dataset_split = dataset[split]
+#     if src_lang in truecase_langs:
+#         tokenized_corpus.extend(dataset_split[src_lang])
+#     if tgt_lang in truecase_langs:
+#         tokenized_corpus.extend(dataset_split[tgt_lang])
 
 # print("train truecase")
 # truecaser = MosesTruecaser()

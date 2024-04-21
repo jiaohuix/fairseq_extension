@@ -37,9 +37,9 @@ export PATH="/root/miniconda3/envs/nmt/bin/:$PATH"
 ```shell
 # touch==2.0.0
 pip install torch==2.0.0 --extra-index-url https://download.pytorch.org/whl/cu113
-#pip install sacremoses tensorboardX  sacrebleu==1.5 apex transformers peft fairseq==0.12.2   subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt
+pip install sacremoses tensorboardX  sacrebleu==1.5 apex   fairseq==0.12.2   subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb 
 
-pip install sacremoses tensorboardX  sacrebleu==1.5 apex fairseq==0.10.0 numpy==1.23.3  subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt
+#pip install sacremoses tensorboardX  sacrebleu==1.5 apex fairseq==0.10.0 numpy==1.23.3  subword-nmt fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt
 
 #bash scripts/env.sh
 ```

@@ -35,6 +35,8 @@ def parse_arguments():
     return parser.parse_args()
 
 args = parse_arguments()
+
+vocab_size = args.vocab_size # merge operations 
 data_name = args.data_name
 # lang_pair = args.lang_pair # change
 out_root = args.out_root

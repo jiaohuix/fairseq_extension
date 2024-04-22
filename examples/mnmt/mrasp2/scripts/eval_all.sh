@@ -7,6 +7,7 @@ lang_pairs=("zh-th" "th-zh" "zh-fr" "fr-zh" "zh-ru" "ru-zh" "zh-ar" "ar-zh")
 
 report_dir=ckpt/${wandb_proj}_multi/report
 #ckpt_dir=ckpt/${wandb_proj}_multi/
+mkdir -p $report_dir
 
 # eval each pair
 for lang_pair in "${lang_pairs[@]}"

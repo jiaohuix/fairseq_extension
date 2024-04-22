@@ -1,16 +1,19 @@
 #!/bin/bash
 if [ $# -lt 4 ];then
-  echo "usage: bash $0 <src> <tgt>  <data> <save_dir> <pretrained_ckpt=ckpt/6.pt> <epoch=50>"
+  echo "usage: bash $0 <src> <tgt>  <data> <save_dir> <wandb_project=ikcest22> <pretrained_ckpt=ckpt/6.pt> <epoch=50>"
   exit
 fi
 SRC=$1
 TGT=$2
 DATA=$3
 SAVE=$4
-CKPT=${5:-"ckpt/6e6d_no_mono.pt"}
-epoch=${6:-"50"}
+wandb_project=${5:-"ikcest22"}
+CKPT=${6:-"ckpt/6e6d_no_mono.pt"}
+epoch=${7:-"20"}
 
-#export WANDB_NAME=$wandb_run_name
+mkdir -p $SAVE
+
+export WANDB_NAME=mRASP2
 
 
 fairseq-train \
@@ -28,12 +31,7 @@ fairseq-train \
     --encoder-learned-pos  --decoder-learned-pos \
     --reset-optimizer --reset-dataloader --fp16 --update-freq 4 \
     --max-epoch $epoch --restore-file $CKPT  --no-epoch-checkpoints  --validate-interval 1 \
-    --tensorboard-logdir $SAVE/vislogs    >> $SAVE/train.log 2>&1
+    --wandb-project $wandb_project --tensorboard-logdir $SAVE/vislogs    >> $SAVE/train.log 2>&1
 
 
-#    --eval-bleu \
-#    --eval-bleu-args '{"beam": 5, "max_len_a": 1.2, "max_len_b": 10}' \
-#    --eval-bleu-remove-bpe \
-#    --best-checkpoint-metric bleu --maximize-best-checkpoint-metric  --no-epoch-checkpoints
-#    --wandb-project $wandb_project \
 

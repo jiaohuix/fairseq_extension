@@ -50,7 +50,7 @@ cp ZhFrRuThArEn.zip ikcest2022/data/ZhFrRuThArEn.zip
 训练评估：
 
 ```shell
-bash scripts/prep_dual.sh
-bash scripts/pipe.sh
+bash scripts/train_6layer.sh src tgt data-bin/ikcest2022_multi/ ckpt/ikest2022_multi  ikcest2022
+bash scripts/train_6layer.sh src tgt data-bin/iwslt2017_multi/ ckpt/iwslt2017_multi  iwslt2017
 ```
 

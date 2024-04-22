@@ -87,7 +87,7 @@ def write_file_append(text_list, outfile):
 
 
 ## 保存到本地
-def save_dataset(dataset, dir):
+def save_dataset(dataset,lang_pair, dir):
     # 创建目录
     os.makedirs(dir, exist_ok=True)
 
@@ -217,6 +217,8 @@ def process_lang_pair_moses(lang_pair):
             write_file_append(tgt_list,tmp_corpus_file)
 
 
+bpe_tokenizer = BPETokenizer(codes_file)
+
 
 def process_lang_pair_bpe(lang_pair):
     outdir = os.path.join(out_root, data_name_suffix, lang_pair) # train_data/ikcest2022/zh-fr
@@ -234,7 +236,7 @@ def process_lang_pair_bpe(lang_pair):
     print(dataset)
 
     print(f"save data to {outdir}...")
-    save_dataset(dataset, outdir)
+    save_dataset(dataset,lang_pair, outdir)
 
 
 # 1 迭代所有的语言(先moses分词) 追加写入文件
@@ -289,30 +291,30 @@ for lang_pair in lang_pairs:
 
 
 # 3 对所有语言apply bpe
-bpe_tokenizer = BPETokenizer(codes_file)
-
-for lang_pair in lang_pairs:
-    src_lang, tgt_lang = lang_pair.split("-")
-
-    outdir = os.path.join(out_root, data_name_suffix, lang_pair) # train_data/ikcest2022/zh-fr
-    cur_pair_codes_file = os.path.join(outdir, "codes.txt") # train_data? 目录下，然后拷贝到所有语言
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-    shutil.copy(codes_file, cur_pair_codes_file)
-
-
-    dataset = all_datasets[lang_pair]
-
-    print(f"apply bpe {lang_pair}")
-    for split in splits:
-        dataset[split] = dataset[split].map(lambda example: bpe_example(example, bpe_tokenizer))
-
-    # print(f"-----preprocess bpe statics------")
-    # calculate_statics(dataset)
-    # print(dataset)
-
-    print(f"save data to {outdir}...")
-    save_dataset(dataset, outdir)
+# bpe_tokenizer = BPETokenizer(codes_file)
+#
+# for lang_pair in lang_pairs:
+#     src_lang, tgt_lang = lang_pair.split("-")
+#
+#     outdir = os.path.join(out_root, data_name_suffix, lang_pair) # train_data/ikcest2022/zh-fr
+#     cur_pair_codes_file = os.path.join(outdir, "codes.txt") # train_data? 目录下，然后拷贝到所有语言
+#     if not os.path.exists(outdir):
+#         os.makedirs(outdir)
+#     shutil.copy(codes_file, cur_pair_codes_file)
+#
+#
+#     dataset = all_datasets[lang_pair]
+#
+#     print(f"apply bpe {lang_pair}")
+#     for split in splits:
+#         dataset[split] = dataset[split].map(lambda example: bpe_example(example, bpe_tokenizer))
+#
+#     # print(f"-----preprocess bpe statics------")
+#     # calculate_statics(dataset)
+#     # print(dataset)
+#
+#     print(f"save data to {outdir}...")
+#     save_dataset(dataset, outdir)
 
 
 

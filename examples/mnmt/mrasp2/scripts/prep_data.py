@@ -60,16 +60,18 @@ def write_file_append(text_list, outfile):
 
 
 ## 保存到本地
-def save_dataset(dataset, dir):
+def save_dataset(dataset,lang_pair, dir):
     # 创建目录
     os.makedirs(dir, exist_ok=True)
 
     # 保存数据集
+    print("save dataset",dataset)
     for split in list(dataset.keys()):
         for lang in lang_pair.split("-"):
             split_fairseq = split.replace("validation", "valid")
             filename = os.path.join(dir, f"{split_fairseq}.{lang}")
             with open(filename, "w", encoding="utf-8") as f:
+                print("for dataset",dataset,"lang",lang, "split",split)
                 for text in dataset[split][lang]:
                     f.write(text.strip() + "\n")
 
@@ -222,7 +224,7 @@ def process_lang_pair(lang_pair):
     print(dataset)
 
     print(f"save data to {outdir}...")
-    save_dataset(dataset, outdir)
+    save_dataset(dataset,lang_pair, outdir)
 
 
 if __name__ == "__main__":
@@ -236,8 +238,8 @@ if __name__ == "__main__":
         os.makedirs(out_root)
 
     data_langs_map = {
-        "ikcest2022": ["zh-th", "th-zh", "zh-fr", "fr-zh", "zh-ru", "ru-zh", "zh-ar", "ar-zh"],
-        # "ikcest2022": ["zh-ar" ,"ar-zh"],
+        # "ikcest2022": ["zh-th", "th-zh", "zh-fr", "fr-zh", "zh-ru", "ru-zh", "zh-ar", "ar-zh"],
+        "ikcest2022": ["zh-ar" ,"ar-zh","zh-th", "th-zh"],
         "iwslt2017": ["en-it", "it-en", "en-ro", "ro-en", "en-nl", "nl-en", "it-ro", "ro-it"]
     }
     print(f"process: {data_name} ")
@@ -263,5 +265,5 @@ if __name__ == "__main__":
     # num_processes = 8  # Change this number according to your system's capabilities
 
     # Moses tokenize and apply BPE concurrently
-    with Pool(args.num_procs) as pool:
+    with Pool(len(lang_pairs)) as pool:
         pool.map(process_lang_pair, lang_pairs)

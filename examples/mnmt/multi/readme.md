@@ -26,6 +26,7 @@ pip install sacremoses tensorboardX  sacrebleu==1.5 apex fairseq==0.12.2 fastcor
 
 ```shell
 mkdir datasets && cd datasets
+# iwslt17
 GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/datasets/iwslt2017
 # 下载DeEnItNlRo-DeEnItNlRo.zip，复制到data/2017-01-trnmted/texts/DeEnItNlRo/DeEnItNlRo/
 
@@ -34,6 +35,14 @@ cp DeEnItNlRo-DeEnItNlRo.zip iwslt2017/data/2017-01-trnmted/texts/DeEnItNlRo/DeE
 
 # 替换为本地路径
 sed -i '50s#.*#REPO_URL = ""#' iwslt2017/iwslt2017.py
+
+
+# ikcest22
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/datasets/miugod/ikcest2022
+wget https://hf-mirror.com/datasets/miugod/ikcest2022/resolve/main/data/ZhFrRuThArEn.zip?download=true  -O "ZhFrRuThArEn.zip"
+cp ZhFrRuThArEn.zip ikcest2022/data/ZhFrRuThArEn.zip
+
+
 ```
 
 

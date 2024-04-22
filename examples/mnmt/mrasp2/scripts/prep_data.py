@@ -15,6 +15,7 @@ import argparse
 import subprocess
 from statistics import mean
 from functools import partial
+from multiprocessing import Pool
 
 import jieba
 from subword_nmt import subword_nmt
@@ -25,42 +26,25 @@ from sacremoses import MosesTokenizer, MosesDetokenizer, MosesTruecaser, MosesDe
 # 设置环境变量
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
+
 # 参数
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Your script description here.")
-    parser.add_argument('-i','--data_name', type=str, default="miugod/ikcest2022", help="Data name")
-    parser.add_argument('-o','--out_root', type=str, default="train_data", help="Output root directory")
-    parser.add_argument('-v','--bpe_codes', type=str, default="dict/codes.bpe.32000.txt", help="bpe code")
+    parser.add_argument('-i', '--data_name', type=str, default="miugod/ikcest2022", help="Data name")
+    parser.add_argument('-o', '--out_root', type=str, default="train_data", help="Output root directory")
+    parser.add_argument('-v', '--bpe_codes', type=str, default="dict/codes.bpe.32000.txt", help="bpe code")
+    parser.add_argument('-n', '--num_procs', type=int, default=8, help="num process")
     return parser.parse_args()
 
-args = parse_arguments()
-data_name = args.data_name
-# lang_pair = args.lang_pair # change
-out_root = args.out_root
-splits = ["train", "validation", "test"]
-
-if not os.path.exists(out_root):
-    os.makedirs(out_root)
-
-data_langs_map = {
-    "ikcest2022": ["zh-th", "th-zh", "zh-fr", "fr-zh", "zh-ru" ,"ru-zh" ,"zh-ar" ,"ar-zh"],
-    # "ikcest2022": ["zh-ar" ,"ar-zh"],
-    "iwslt2017": ["en-it", "it-en" ,"en-ro" ,"ro-en" ,"en-nl" ,"nl-en" ,"it-ro", "ro-it"]
-}
-print(f"process: {data_name} ")
-
-data_name_suffix = data_name.rstrip("/").split("/")[-1]
-print("data_name_suffix",data_name_suffix)
-assert data_name_suffix in data_langs_map.keys()
-lang_pairs = data_langs_map[data_name_suffix]
 
 ###################### change: 函数放这
 
-def write_file(res,file):
-    with open(file,'w',encoding='utf-8') as f:
+def write_file(res, file):
+    with open(file, 'w', encoding='utf-8') as f:
         f.writelines(res)
     print(f'write to {file} success, total {len(res)} lines.')
+
 
 def write_file_append(text_list, outfile):
     try:
@@ -73,7 +57,6 @@ def write_file_append(text_list, outfile):
 
     except IOError:
         print(f'write to {outfile} error.')
-
 
 
 ## 保存到本地
@@ -89,6 +72,7 @@ def save_dataset(dataset, dir):
             with open(filename, "w", encoding="utf-8") as f:
                 for text in dataset[split][lang]:
                     f.write(text.strip() + "\n")
+
 
 ## 预分词
 class MultilingualTokenizer:
@@ -134,8 +118,7 @@ class BPETokenizer:
         if not raw_string:
             return raw_string
         bpe_str = self.bpe.process_line(raw_string)
-        return " ".join(bpe_str.split()) # ?
-
+        return " ".join(bpe_str.split())  # ?
 
 
 def tokenize_example(example, tokenizer: MultilingualTokenizer):
@@ -158,71 +141,77 @@ def truecase_example(example, truecaser: MosesTruecaser):
 def bpe_example(example, tokenizer: BPETokenizer):
     # langs = list(example.keys())
     # langs = lang_pair.split("-")
-    example[src_lang] = tokenizer.tokenize(example[src_lang])
-    example[tgt_lang] = tokenizer.tokenize(example[tgt_lang])
-    
+    langs = list(example.keys())
+    for lang in langs:
+        example[lang] = tokenizer.tokenize(example[lang])
+
     return example
 
 
-def calculate_statics(dataset):
-    def _map_fn(example):
-        # 添加src_lang tgt_lang, ratio; 以及打印平均值
-        example["src_len"] = len(example[src_lang].split())
-        example["tgt_len"] = len(example[tgt_lang].split())
-        example["ratio"] = max(example["src_len"],  example["tgt_len"]) / min(example["src_len"],  example["tgt_len"])
-        return example
-
-    for split in splits:
-        dataset[split] = dataset[split].map(lambda example: _map_fn(example))
-        avg_src_len = mean(dataset[split]["src_len"])
-        avg_tgt_len = mean(dataset[split]["tgt_len"])
-        avg_ratio = mean(dataset[split]["ratio"])
-        print(f"{split} | avg_src_len :{avg_src_len} |avg_tgt_len: {avg_tgt_len} | avg_ratio：{avg_ratio} ")
+# def calculate_statics(dataset):
+#     def _map_fn(example):
+#         # 添加src_lang tgt_lang, ratio; 以及打印平均值
+#         example["src_len"] = len(example[src_lang].split())
+#         example["tgt_len"] = len(example[tgt_lang].split())
+#         example["ratio"] = max(example["src_len"], example["tgt_len"]) / min(example["src_len"], example["tgt_len"])
+#         return example
+#
+#     for split in splits:
+#         dataset[split] = dataset[split].map(lambda example: _map_fn(example))
+#         avg_src_len = mean(dataset[split]["src_len"])
+#         avg_tgt_len = mean(dataset[split]["tgt_len"])
+#         avg_ratio = mean(dataset[split]["ratio"])
+#         print(f"{split} | avg_src_len :{avg_src_len} |avg_tgt_len: {avg_tgt_len} | avg_ratio：{avg_ratio} ")
 
 
 ######################
 
-# 1 迭代所有的语言(先moses分词) 追加写入文件
-all_datasets = {} # lang_pair: data={train valid test}
-tmp_corpus_file=f"./corpus_{data_name_suffix}.tmp"
-
-seen = set()
-for lang_pair in lang_pairs:
-
-    src_lang, tgt_lang = lang_pair.split("-")
-
-    # 加载数据(先用命令行下到本地)
-    cfg_name = data_name_suffix + "-" + lang_pair
-    dataset = load_dataset(data_name, cfg_name, cache_dir="./datasets/", verification_mode="no_checks") # todo: 保存到字典
-    print(dataset["train"], len(dataset["train"]))
 
 
+
+# # 2 moses
+# def process_lang_pair_moses(lang_pair):
+#     mtokenizer = MultilingualTokenizer()
+#     print("moses tokenize")
+#     for split in splits:
+#         all_datasets[lang_pair][split] = all_datasets[lang_pair][split].map(
+#             lambda example: tokenize_example(example["translation"], tokenizer=mtokenizer),
+#             remove_columns=["translation"])
+#     print(all_datasets[lang_pair])
+#
+#
+# # 3 对所有语言apply bpe
+#
+#
+# def process_lang_pair_bpe(lang_pair):
+#     outdir = os.path.join(out_root, data_name_suffix, lang_pair)  # train_data/ikcest2022/zh-fr
+#     if not os.path.exists(outdir):
+#         os.makedirs(outdir)
+#
+#     dataset = all_datasets[lang_pair]
+#
+#     print(f"apply bpe {lang_pair}")
+#     for split in splits:
+#         dataset[split] = dataset[split].map(lambda example: bpe_example(example, bpe_tokenizer))
+#
+#     print(dataset)
+#
+#     print(f"save data to {outdir}...")
+#     save_dataset(dataset, outdir)
+
+
+def process_lang_pair(lang_pair):
+    # Moses tokenize
     mtokenizer = MultilingualTokenizer()
-
-    print("moses tokenize")
     for split in splits:
-        dataset[split] = dataset[split].map(lambda example: tokenize_example(example["translation"], tokenizer=mtokenizer),
-                                            remove_columns=["translation"])
-    print(f"-----preprocess moses statics------")
-    calculate_statics(dataset)
-    print(dataset)
+        all_datasets[lang_pair][split] = all_datasets[lang_pair][split].map(
+            lambda example: tokenize_example(example["translation"], tokenizer=mtokenizer),
+            remove_columns=["translation"])
 
-    # 保存moses处理好的data
-    all_datasets[lang_pair] = dataset
-
-
-
-
-# 3 对所有语言apply bpe
-bpe_tokenizer = BPETokenizer(args.bpe_codes)
-
-for lang_pair in lang_pairs:
-    src_lang, tgt_lang = lang_pair.split("-")
-
-    outdir = os.path.join(out_root, data_name_suffix, lang_pair) # train_data/ikcest2022/zh-fr
+    # Apply BPE
+    outdir = os.path.join(out_root, data_name_suffix, lang_pair)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-
 
     dataset = all_datasets[lang_pair]
 
@@ -230,14 +219,49 @@ for lang_pair in lang_pairs:
     for split in splits:
         dataset[split] = dataset[split].map(lambda example: bpe_example(example, bpe_tokenizer))
 
-    print(f"-----preprocess bpe statics------")
-    calculate_statics(dataset)
     print(dataset)
 
     print(f"save data to {outdir}...")
     save_dataset(dataset, outdir)
 
 
+if __name__ == "__main__":
+    args = parse_arguments()
+    data_name = args.data_name
+    # lang_pair = args.lang_pair # change
+    out_root = args.out_root
+    splits = ["train", "validation", "test"]
+
+    if not os.path.exists(out_root):
+        os.makedirs(out_root)
+
+    data_langs_map = {
+        "ikcest2022": ["zh-th", "th-zh", "zh-fr", "fr-zh", "zh-ru", "ru-zh", "zh-ar", "ar-zh"],
+        # "ikcest2022": ["zh-ar" ,"ar-zh"],
+        "iwslt2017": ["en-it", "it-en", "en-ro", "ro-en", "en-nl", "nl-en", "it-ro", "ro-it"]
+    }
+    print(f"process: {data_name} ")
+
+    data_name_suffix = data_name.rstrip("/").split("/")[-1]
+    print("data_name_suffix", data_name_suffix)
+    assert data_name_suffix in data_langs_map.keys()
+    lang_pairs = data_langs_map[data_name_suffix]
+
+    # 1 迭代所有的语言(先moses分词) 追加写入文件
+    all_datasets = {}  # lang_pair: data={train valid test}
+
+    # 1 load data
+    for lang_pair in lang_pairs:
+        cfg_name = data_name_suffix + "-" + lang_pair
+        all_datasets[lang_pair] = load_dataset(data_name, cfg_name, cache_dir="./datasets/",
+                                               verification_mode="no_checks")  # todo: 保存到字典
+        print(all_datasets[lang_pair]["train"], len(all_datasets[lang_pair]["train"]))
+    bpe_tokenizer = BPETokenizer(args.bpe_codes)
 
 
+    # Define the number of processes you want to use
+    # num_processes = 8  # Change this number according to your system's capabilities
 
+    # Moses tokenize and apply BPE concurrently
+    with Pool(args.num_procs) as pool:
+        pool.map(process_lang_pair, lang_pairs)

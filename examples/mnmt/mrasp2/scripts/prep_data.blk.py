@@ -21,11 +21,6 @@ from subword_nmt import subword_nmt
 from pythainlp.tokenize import word_tokenize
 from datasets import concatenate_datasets, load_dataset
 from sacremoses import MosesTokenizer, MosesDetokenizer, MosesTruecaser, MosesDetruecaser
-from tokenizers.pre_tokenizers import Whitespace
-from tokenizers.models import BPE
-from tokenizers.trainers import BpeTrainer
-from tokenizers import Tokenizer, models, pre_tokenizers, decoders, trainers, processors
-
 
 # 设置环境变量
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
@@ -36,19 +31,14 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Your script description here.")
     parser.add_argument('-i','--data_name', type=str, default="miugod/ikcest2022", help="Data name")
     parser.add_argument('-o','--out_root', type=str, default="train_data", help="Output root directory")
-    parser.add_argument('-v','--vocab_size', type=int, default=32000, help="Vocabulary size (joint bpe merge operations)")
-    parser.add_argument('-n', '--num_procs', type=int, default=8, help="num process")
+    parser.add_argument('-v','--bpe_codes', type=str, default="dict/codes.bpe.32000.txt", help="bpe code")
     return parser.parse_args()
 
 args = parse_arguments()
-
-vocab_size = args.vocab_size # merge operations 
 data_name = args.data_name
 # lang_pair = args.lang_pair # change
 out_root = args.out_root
 splits = ["train", "validation", "test"]
-seen = set()
-tmp_corpus_file=f"./corpus_{data_name_suffix}.tmp"
 
 if not os.path.exists(out_root):
     os.makedirs(out_root)
@@ -168,10 +158,9 @@ def truecase_example(example, truecaser: MosesTruecaser):
 def bpe_example(example, tokenizer: BPETokenizer):
     # langs = list(example.keys())
     # langs = lang_pair.split("-")
-    langs = list(example.keys())
-    for lang in langs:
-        example[lang] = tokenizer.tokenize(example[lang])
-
+    example[src_lang] = tokenizer.tokenize(example[src_lang])
+    example[tgt_lang] = tokenizer.tokenize(example[tgt_lang])
+    
     return example
 
 
@@ -193,37 +182,47 @@ def calculate_statics(dataset):
 
 ######################
 
+# 1 迭代所有的语言(先moses分词) 追加写入文件
+all_datasets = {} # lang_pair: data={train valid test}
+tmp_corpus_file=f"./corpus_{data_name_suffix}.tmp"
 
-def process_lang_pair_moses(lang_pair):
+seen = set()
+for lang_pair in lang_pairs:
+
+    src_lang, tgt_lang = lang_pair.split("-")
+
+    # 加载数据(先用命令行下到本地)
+    cfg_name = data_name_suffix + "-" + lang_pair
+    dataset = load_dataset(data_name, cfg_name, cache_dir="./datasets/", verification_mode="no_checks") # todo: 保存到字典
+    print(dataset["train"], len(dataset["train"]))
+
+
     mtokenizer = MultilingualTokenizer()
+
     print("moses tokenize")
     for split in splits:
-        all_datasets[lang_pair][split] = all_datasets[lang_pair][split].map(
-            lambda example: tokenize_example(example["translation"], tokenizer=mtokenizer),
-            remove_columns=["translation"])
-    print(all_datasets[lang_pair])
+        dataset[split] = dataset[split].map(lambda example: tokenize_example(example["translation"], tokenizer=mtokenizer),
+                                            remove_columns=["translation"])
+    print(f"-----preprocess moses statics------")
+    calculate_statics(dataset)
+    print(dataset)
 
-    if not lang_pair in seen:
-        print(f"write {lang_pair} to corpus")
-        reverse_pair = "-".join(list(reversed(lang_pair.split("-"))))
-        seen.add(lang_pair)
-        seen.add(reverse_pair)
-
-        # 写入临时文件(正向反向只写入一次)
-        for split in splits:
-            src_list = dataset[split][src_lang]
-            tgt_list = dataset[split][tgt_lang]
-            write_file_append(src_list,tmp_corpus_file)
-            write_file_append(tgt_list,tmp_corpus_file)
+    # 保存moses处理好的data
+    all_datasets[lang_pair] = dataset
 
 
 
-def process_lang_pair_bpe(lang_pair):
+
+# 3 对所有语言apply bpe
+bpe_tokenizer = BPETokenizer(args.bpe_codes)
+
+for lang_pair in lang_pairs:
+    src_lang, tgt_lang = lang_pair.split("-")
+
     outdir = os.path.join(out_root, data_name_suffix, lang_pair) # train_data/ikcest2022/zh-fr
-    cur_pair_codes_file = os.path.join(outdir, "codes.txt") # train_data? 目录下，然后拷贝到所有语言
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-    shutil.copy(codes_file, cur_pair_codes_file)
+
 
     dataset = all_datasets[lang_pair]
 
@@ -231,109 +230,14 @@ def process_lang_pair_bpe(lang_pair):
     for split in splits:
         dataset[split] = dataset[split].map(lambda example: bpe_example(example, bpe_tokenizer))
 
+    print(f"-----preprocess bpe statics------")
+    calculate_statics(dataset)
     print(dataset)
 
     print(f"save data to {outdir}...")
     save_dataset(dataset, outdir)
 
 
-# 1 迭代所有的语言(先moses分词) 追加写入文件
-all_datasets = {} # lang_pair: data={train valid test}
-for lang_pair in lang_pairs:
-    cfg_name = data_name_suffix + "-" + lang_pair
-    all_datasets[lang_pair] = load_dataset(data_name, cfg_name, cache_dir="./datasets/",
-                                           verification_mode="no_checks")  # todo: 保存到字典
-    print(all_datasets[lang_pair]["train"], len(all_datasets[lang_pair]["train"]))
 
 
 
-
-# for lang_pair in lang_pairs:
-#
-#     src_lang, tgt_lang = lang_pair.split("-")
-#
-#     # 加载数据(先用命令行下到本地)
-#     cfg_name = data_name_suffix + "-" + lang_pair
-#     dataset = load_dataset(data_name, cfg_name, cache_dir="./datasets/", verification_mode="no_checks") # todo: 保存到字典
-#     print(dataset["train"], len(dataset["train"]))
-#
-#
-#     mtokenizer = MultilingualTokenizer()
-#
-#     print("moses tokenize")
-#     for split in splits:
-#         dataset[split] = dataset[split].map(lambda example: tokenize_example(example["translation"], tokenizer=mtokenizer),
-#                                             remove_columns=["translation"])
-#     print(f"-----preprocess moses statics------")
-#     calculate_statics(dataset)
-#     print(dataset)
-#
-#     # 保存moses处理好的data
-#     all_datasets[lang_pair] = dataset
-#
-#     if not lang_pair in seen:
-#         print(f"write {lang_pair} to corpus")
-#         reverse_pair = "-".join(list(reversed(lang_pair.split("-"))))
-#         seen.add(lang_pair)
-#         seen.add(reverse_pair)
-#
-#         # 写入临时文件(正向反向只写入一次)
-#         for split in splits:
-#             src_list = dataset[split][src_lang]
-#             tgt_list = dataset[split][tgt_lang]
-#             write_file_append(src_list,tmp_corpus_file)
-#             write_file_append(tgt_list,tmp_corpus_file)
-
-
-
-
-
-# 3 对所有语言apply bpe
-bpe_tokenizer = BPETokenizer(codes_file)
-
-for lang_pair in lang_pairs:
-    src_lang, tgt_lang = lang_pair.split("-")
-
-    outdir = os.path.join(out_root, data_name_suffix, lang_pair) # train_data/ikcest2022/zh-fr
-    cur_pair_codes_file = os.path.join(outdir, "codes.txt") # train_data? 目录下，然后拷贝到所有语言
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-    shutil.copy(codes_file, cur_pair_codes_file)
-
-
-    dataset = all_datasets[lang_pair]
-
-    print(f"apply bpe {lang_pair}")
-    for split in splits:
-        dataset[split] = dataset[split].map(lambda example: bpe_example(example, bpe_tokenizer))
-
-    # print(f"-----preprocess bpe statics------")
-    # calculate_statics(dataset)
-    # print(dataset)
-
-    print(f"save data to {outdir}...")
-    save_dataset(dataset, outdir)
-
-
-
-
-
-if __name__ == "__main__":
-
-    # 1 Moses tokenize
-    with Pool(args.num_procs) as pool:
-        pool.map(process_lang_pair_moses, lang_pairs)
-
-    # 2 train bpe
-    print("train bpe(subword-nmt)")
-    codes_file = os.path.join(out_root, "codes.txt")
-    subprocess.run(['subword-nmt', 'learn-bpe',
-                    '-s', str(vocab_size),
-                    '--input', tmp_corpus_file,
-                    '-o', codes_file])  # codes file
-
-    os.remove(tmp_corpus_file)
-
-    # 3 apply BPE
-    with Pool(args.num_procs) as pool:
-        pool.map(process_lang_pair_bpe, lang_pairs)

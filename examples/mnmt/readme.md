@@ -9,7 +9,7 @@ iwslt17   ikcest22
 - [x] 2 双向transformer： dual
 - [x] 3 m-transformer
 - [ ] 4 m2m(多语言微调+双向微调+单向微调)
-- [ ] 5 *mrasp2微调
+- [x] 5 mrasp2微调
 - [ ] 6 na-nmt
 - [ ] 7 lass
 - [ ] 8 nllb

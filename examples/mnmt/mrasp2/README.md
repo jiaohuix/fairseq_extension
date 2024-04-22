@@ -25,10 +25,21 @@ mRASP2/mCOLT, representing multilingual Contrastive Learning for Transformer, is
 ## Pre-requisite
 ```bash
 pip install -r requirements.txt
-# install fairseq
-git clone https://github.com/pytorch/fairseq
+#pip install fairseq==0.12.2
+git clone https://github.com/facebookresearch/fairseq.git
 cd fairseq
 pip install --editable ./
+cd ..
+
+git clone https://github.com/jiaohuix/fairseq_extension.git
+
+mv fairseq_extension/examples/mnmt .
+cd mnmt/mrasp2/
+wget  https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/acl2021/mrasp2/6e6d_no_mono.pt -O "ckpt/6e6d_no_mono.pt"
+
+pip install jieba subword-nmt pythainlp sacremoses sacrebleu datasets tokenizers
+
+bash scripts/prep_multi.sh
 ```
 
 ## Training Data and Checkpoints

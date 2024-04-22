@@ -3,3 +3,8 @@ sacrebleu
 sacremoses
 kytea
 six
+jieba
+subword-nmt
+pythainlp
+datasets 
+tokenizers

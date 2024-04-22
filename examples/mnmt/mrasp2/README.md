@@ -37,7 +37,7 @@ mv fairseq_extension/examples/mnmt .
 cd mnmt/mrasp2/
 wget  https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/acl2021/mrasp2/6e6d_no_mono.pt -O "ckpt/6e6d_no_mono.pt"
 
-pip install jieba subword-nmt pythainlp sacremoses sacrebleu datasets tokenizers
+#pip install jieba subword-nmt pythainlp sacremoses sacrebleu datasets tokenizers
 
 bash scripts/prep_multi.sh
 ```

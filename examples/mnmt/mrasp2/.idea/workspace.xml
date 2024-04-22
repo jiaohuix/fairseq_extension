@@ -21,13 +21,18 @@
   <component name="ChangeListManager">
     <list default="true" id="ce927bff-cc6b-4487-80a7-511b99b94442" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/eval_all.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/eval_all.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/train_6layer.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/train_6layer.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../.." />
@@ -57,7 +62,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1713775863218</updated>
-      <workItem from="1713775864793" duration="9226000" />
+      <workItem from="1713775864793" duration="10157000" />
     </task>
     <servers />
   </component>

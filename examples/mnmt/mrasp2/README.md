@@ -42,7 +42,16 @@ wget  https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/acl2021/mrasp2/6
 bash scripts/prep_multi.sh
 ```
 
+词表裁剪：
+
+```shell
+python trim_dict.py --model-path ckpt/6e6d_no_mono.pt --pt-dict dict/bpe_vocab.txt  --ft-dict ./dict.txt --langs LANG_TOK_ZH,LANG_TOK_EN  --output ckpt/mrasp2_zhen.pt
+```
+
+
+
 ## Training Data and Checkpoints
+
 We release our preprocessed training data and checkpoints in the following.
 ### Dataset
 

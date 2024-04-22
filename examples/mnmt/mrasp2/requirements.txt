@@ -1,0 +1,5 @@
+subword-nmt
+sacrebleu
+sacremoses
+kytea
+six

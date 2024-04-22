@@ -36,7 +36,7 @@ do
     echo "Source language: $src_lang"
     echo "Target language: $tgt_lang"
 
-    bash scripts/eval.sh src tgt data-bin/${wandb_proj}/${lang_pair}  $ckpt_dir/checkpoint_best.pt >  $ckpt_dir/gen_${lang_pair}.txt
+    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${lang_pair}  $ckpt_dir/checkpoint_best.pt >  $ckpt_dir/gen_${lang_pair}.txt
 
     # report 
     hypo_file=$report_dir/${src_lang}_${tgt_lang}.rst
@@ -72,8 +72,8 @@ do
 
     # todo : 评估两个语向
 
-    bash scripts/eval.sh src tgt data-bin/${wandb_proj}/${lang_pair}  $ckpt_dir/checkpoint_best.pt >  $ckpt_dir/gen_${lang_pair}.txt
-    bash scripts/eval.sh src tgt data-bin/${wandb_proj}/${reverse_pair}  $ckpt_dir/checkpoint_best.pt >  $ckpt_dir/gen_${reverse_pair}.txt 
+    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${lang_pair}  $ckpt_dir/checkpoint_best.pt >  $ckpt_dir/gen_${lang_pair}.txt
+    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${reverse_pair}  $ckpt_dir/checkpoint_best.pt >  $ckpt_dir/gen_${reverse_pair}.txt 
 
     if [[ -e $ckpt_dir/checkpoint_best.pt ]]; then
         # fwd
@@ -126,8 +126,8 @@ do
     bash scripts/train_ft.sh uni.$src_lang $tgt_lang $data_bin_bwd $ckpt_dir_bwd  $ckpt $wandb_proj 
 
 
-    bash scripts/eval.sh src tgt $data_bin_fwd $ckpt_dir_fwd/checkpoint_best.pt >  $ckpt_dir_fwd/gen_${lang_pair}.txt
-    bash scripts/eval.sh src tgt $data_bin_bwd $ckpt_dir_bwd/checkpoint_best.pt >  $ckpt_dir_bwd/gen_${reverse_pair}.txt 
+    bash scripts/eval.sh $src_lang $tgt_lang $data_bin_fwd $ckpt_dir_fwd/checkpoint_best.pt >  $ckpt_dir_fwd/gen_${lang_pair}.txt
+    bash scripts/eval.sh $src_lang $tgt_lang $data_bin_bwd $ckpt_dir_bwd/checkpoint_best.pt >  $ckpt_dir_bwd/gen_${reverse_pair}.txt 
 
     if [[ -e $ckpt_dir_fwd/checkpoint_best.pt ]]; then
         # fwd

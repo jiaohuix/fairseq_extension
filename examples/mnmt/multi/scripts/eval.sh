@@ -28,7 +28,7 @@ echo "args: $args"
 
 
 
-fairseq-generate  $data  -s $src -t $tgt \
+fairseq-generate  $data  -s src -t tgt \
     --path $ckpt \
     --beam 5 --batch-size 128 --remove-bpe  --sacrebleu --lenpen 1 $args
 

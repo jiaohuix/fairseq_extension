@@ -1,5 +1,6 @@
 dataset=datasets/iwslt2017
 wandb_proj=iwslt2017
+data_outdir=train_data
 lang_pairs=( "it-en" "en-it" "ro-en"  "en-ro" "nl-en" "en-nl"  "it-ro" "ro-it")
 ckpt=ckpt/${wandb_proj}_multi/
 report_dir=ckpt/${wandb_proj}_multi/report

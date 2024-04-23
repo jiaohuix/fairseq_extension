@@ -1,8 +1,7 @@
 dataset=datasets/ikcest2022
 wandb_proj=ikcest2022
 data_outdir=train_data
-lang_pairs=("zh-th" "th-zh" "zh-fr" "fr-zh" "zh-ru" "ru-zh" "zh-ar" "ar-zh")
-lang_pairs=("zh-ru")
+lang_pairs=("fr-zh" "zh-fr" "ru-zh" "zh-ru"  "th-zh" "zh-th" "ar-zh"  "zh-ar" )
 
 ckpt=ckpt/${wandb_proj}_multi/
 report_dir=ckpt/${wandb_proj}_multi/report

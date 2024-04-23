@@ -23,7 +23,7 @@ fairseq-train \
     --dropout 0.3 --weight-decay 0.0001 \
     --arch transformer_vaswani_wmt_en_de_big \
     --share-all-embeddings  \
-    --max-tokens 4096 --update-freq 2  -max-epoch $epoch --max-update 10000  \
+    --max-tokens 4096 --update-freq 2  --max-epoch $epoch --max-update 10000  \
     --lr 3e-5 --lr-scheduler inverse_sqrt --warmup-updates 4000 --fp16 \
     --criterion label_smoothed_cross_entropy --label-smoothing 0.1 \
     --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 \

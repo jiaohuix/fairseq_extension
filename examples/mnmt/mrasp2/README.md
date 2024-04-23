@@ -42,6 +42,8 @@ wget  https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/acl2021/mrasp2/6
 bash scripts/prep_multi.sh
 bash scripts/pipe.sh
 
+# 权重平均
+python scripts/average_checkpoints.py --inputs ckpt/iwslt2017_multi/*.pt --num-best-checkpoints 1 --output ckpt/iwslt2017_multi/avg1.pt
 ```
 
 词表裁剪：

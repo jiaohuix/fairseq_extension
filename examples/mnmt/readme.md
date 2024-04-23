@@ -7,14 +7,17 @@ iwslt17   ikcest22
 
 - [x] 1 单向transformer： baseline
 - [x] 2 双向transformer： dual
-- [x] 3 m-transformer
+- [x] 3 m-transformer： multi
 - [ ] 4 m2m(多语言微调+双向微调+单向微调)
-- [x] 5 mrasp2微调
+  - [ ] 修改训练、预测、评估脚本的数据集加载
+  - [ ] 修改双向、单向微调
+- [x] 5 mrasp2微调：mrasp2
 - [ ] 6 na-nmt
 - [ ] 7 lass
-- [ ] 8 nllb
+- [ ] 8 nllb/mbart（同m2m）
 - [ ] 9 多任务训练
 - [ ] 10 lora微调
+  - [ ] 参考m2m
 
 
 

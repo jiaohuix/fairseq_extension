@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 # @Time    : 05.02.22 09:27
 # @Author  : Wen Lai
-# @Site    :
+# @Site    : 
 # @File    : run_translation.py
-# @Usage information:
+# @Usage information: 
 
 # Copyright (c) 2021-present, CIS, Inc.
 # All rights reserved.
@@ -15,11 +15,7 @@
 
 
 """
-数据格式：
-{ "translation": { "en": "Others have dismissed him as a joke.", "ro": "Alții l-au numit o glumă." }}
-{ "translation": { "en": "And some are holding out for an implosion.", "ro": "Iar alții așteaptă implozia." }}
-
-#todo : 指定固定语言
+Example: 
 
 """
 import logging
@@ -29,10 +25,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import datasets
-
-import pandas as pd
-from datasets import Dataset
-import evaluate
 import numpy as np
 from datasets import load_dataset, load_metric
 
@@ -49,7 +41,7 @@ from transformers import (
     MBartTokenizer,
     MBartTokenizerFast,
     Seq2SeqTrainer,
-    # M2MSeq2SeqTrainer,
+    M2MSeq2SeqTrainer,
     Seq2SeqTrainingArguments,
     default_data_collator,
     set_seed,
@@ -58,6 +50,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from torch.utils.data import ConcatDataset
+
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.17.0.dev0")
@@ -101,7 +94,7 @@ class ModelArguments:
         default=False,
         metadata={
             "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
-                    "with private models)."
+            "with private models)."
         },
     )
 
@@ -123,16 +116,12 @@ class DataTrainingArguments:
     dataset_config_name: Optional[str] = field(
         default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
     )
-    lang_pairs: Optional[str] = field(
-        default=None, metadata={"help": "Language pairs,such as zh-ru,fr-zh"}
-    )
-
     train_file: Optional[str] = field(default=None, metadata={"help": "The input training data file (a jsonlines)."})
     validation_file: Optional[str] = field(
         default=None,
         metadata={
             "help": "An optional input evaluation data file to evaluate the metrics (sacreblue) on "
-                    "a jsonlines file."
+            "a jsonlines file."
         },
     )
     test_file: Optional[str] = field(
@@ -152,59 +141,59 @@ class DataTrainingArguments:
         default=1024,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
-                    "than this will be truncated, sequences shorter will be padded."
+            "than this will be truncated, sequences shorter will be padded."
         },
     )
     max_target_length: Optional[int] = field(
         default=128,
         metadata={
             "help": "The maximum total sequence length for target text after tokenization. Sequences longer "
-                    "than this will be truncated, sequences shorter will be padded."
+            "than this will be truncated, sequences shorter will be padded."
         },
     )
     val_max_target_length: Optional[int] = field(
         default=None,
         metadata={
             "help": "The maximum total sequence length for validation target text after tokenization. Sequences longer "
-                    "than this will be truncated, sequences shorter will be padded. Will default to `max_target_length`."
-                    "This argument is also used to override the ``max_length`` param of ``model.generate``, which is used "
-                    "during ``evaluate`` and ``predict``."
+            "than this will be truncated, sequences shorter will be padded. Will default to `max_target_length`."
+            "This argument is also used to override the ``max_length`` param of ``model.generate``, which is used "
+            "during ``evaluate`` and ``predict``."
         },
     )
     pad_to_max_length: bool = field(
         default=False,
         metadata={
             "help": "Whether to pad all samples to model maximum sentence length. "
-                    "If False, will pad the samples dynamically when batching to the maximum length in the batch. More "
-                    "efficient on GPU but very bad for TPU."
+            "If False, will pad the samples dynamically when batching to the maximum length in the batch. More "
+            "efficient on GPU but very bad for TPU."
         },
     )
     max_train_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-                    "value if set."
+            "value if set."
         },
     )
     max_eval_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-                    "value if set."
+            "value if set."
         },
     )
     max_predict_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of prediction examples to this "
-                    "value if set."
+            "value if set."
         },
     )
     num_beams: Optional[int] = field(
         default=None,
         metadata={
             "help": "Number of beams to use for evaluation. This argument will be passed to ``model.generate``, "
-                    "which is used during ``evaluate`` and ``predict``."
+            "which is used during ``evaluate`` and ``predict``."
         },
     )
     ignore_pad_token_for_loss: bool = field(
@@ -220,8 +209,8 @@ class DataTrainingArguments:
         default=None,
         metadata={
             "help": "The token to force as the first generated token after the :obj:`decoder_start_token_id`."
-                    "Useful for multilingual models like :doc:`mBART <../model_doc/mbart>` where the first generated token "
-                    "needs to be the target language token.(Usually it is the target language token)"
+            "Useful for multilingual models like :doc:`mBART <../model_doc/mbart>` where the first generated token "
+            "needs to be the target language token.(Usually it is the target language token)"
         },
     )
 
@@ -342,40 +331,27 @@ def main():
         )
 
     ### process the datasets for all language pairs
-    data_name_suffix = data_args.dataset_name.rstrip("/").split("/")[-1]
-    data_langs_map = {
-        "ikcest2022": ["zh-th", "th-zh", "zh-fr", "fr-zh", "zh-ru", "ru-zh", "zh-ar", "ar-zh"],
-        "iwslt2017": ["en-it", "it-en", "en-ro", "ro-en", "en-nl", "nl-en", "it-ro", "ro-it"]
-    }
-
-    # infer language pair
-    if data_args.lang_pairs is not None:
-        cfg_pairs = data_args.lang_pairs.strip().split(",")
-        valid_pairs = []
-        for pair in cfg_pairs:
-            langs = pair.split("-")
-            if len(langs) == 2 and pair in data_langs_map[data_name_suffix]:
-                valid_pairs.append(pair)
-        if len(valid_pairs) > 0:
-            lang_pairs = valid_pairs
-        else:
-            # Handle case when no valid pairs found
-            raise ValueError("No valid language pairs found in provided config.")
-    else:
-        lang_pairs = data_langs_map[data_name_suffix]
+    lang_list = ['mk-sr', 'et-mk', 'hr-mk', 'hr-hu', 'et-hu',
+                 'hr-sr', 'en-sr', 'hu-sr', 'hu-mk', 'en-et',
+                 'et-sr', 'en-hr', 'et-hr', 'en-hu', 'en-mk',
+                 'sr-mk', 'mk-et', 'mk-hr', 'hu-hr', 'hu-et',
+                 'sr-hr', 'sr-en', 'sr-hu', 'mk-hu', 'et-en',
+                 'sr-et', 'hr-en', 'hr-et', 'hu-en', 'mk-en',
+                 ]
 
     train_datasets_list = []
     valid_datasets_list = []
-    for lang_pair in lang_pairs:
-        source_lang = lang_pair.split('-')[0]
-        target_lang = lang_pair.split('-')[1]
+
+    for ll in lang_list:
+        source_lang = ll.split('-')[0]
+        target_lang = ll.split('-')[1]
         tokenizer.src_lang = source_lang
         tokenizer.tgt_lang = target_lang
         forced_bos_token_id = tokenizer.lang_code_to_id[target_lang]
 
         def preprocess_function(examples):
-            inputs = [ex[source_lang] for ex in examples["translation"]]
-            targets = [ex[target_lang] for ex in examples["translation"]]
+            inputs = [ex for ex in examples[source_lang]]
+            targets = [ex for ex in examples[target_lang]]
             inputs = [prefix + inp for inp in inputs]
             model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
 
@@ -395,23 +371,16 @@ def main():
             model_inputs["forced_bos_token_id"] = forced_bos_list
             return model_inputs
 
-        # load data
-        dataset_config_name = data_name_suffix + "-" + lang_pair
-
-        dataset = load_dataset(data_args.dataset_name, dataset_config_name, cache_dir="./datasets/",
-                               verification_mode="no_checks")
-
-        train_datasets, valid_datasets = dataset["train"], dataset["validation"]
-        # tokenize
-        lang = f'{source_lang}-{target_lang}'
-        column_names = train_datasets.column_names
+        train_datasets = load_dataset('csv', data_files=os.path.join(data_args.data_path, ll, 'train.tsv'), delimiter='\t')
+        valid_datasets = load_dataset('csv', data_files=os.path.join(data_args.data_path, ll, 'valid.tsv'), delimiter='\t')
+        column_names = train_datasets["train"].column_names
         train_datasets_token = train_datasets.map(
             preprocess_function,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Running tokenizer on {lang} train dataset",
+            desc="Running tokenizer on dataset",
         )
         valid_datasets_token = valid_datasets.map(
             preprocess_function,
@@ -419,16 +388,14 @@ def main():
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Running tokenizer on {lang} valid dataset",
+            desc="Running tokenizer on dataset",
         )
-        train_datasets_list.append(train_datasets_token)
-        valid_datasets_list.append(valid_datasets_token)
+        train_datasets_list.append(train_datasets_token['train'])
+        valid_datasets_list.append(valid_datasets_token['train'])
 
     ### create dataloaders
     train_dataset_merge = ConcatDataset(train_datasets_list)
     eval_dataset_merge = ConcatDataset(valid_datasets_list)
-    logger.info(f"train_dataset size {len(train_dataset_merge)}")
-    logger.info(f"eval_dataset size {len(eval_dataset_merge)}")
 
     # Data collator
     label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
@@ -443,9 +410,7 @@ def main():
         )
 
     # Metric
-    metric = evaluate.load("sacrebleu")
-
-    print("load metric over.")
+    metric = load_metric("sacrebleu")
 
     def postprocess_text(preds, labels):
         preds = [pred.strip() for pred in preds]
@@ -475,17 +440,7 @@ def main():
         return result
 
     # Initialize our Trainer
-    # trainer = M2MSeq2SeqTrainer(
-    #     model=model,
-    #     args=training_args,
-    #     train_dataset=train_dataset_merge if training_args.do_train else None,
-    #     eval_dataset=eval_dataset_merge if training_args.do_eval else None,
-    #     tokenizer=tokenizer,
-    #     data_collator=data_collator,
-    #     compute_metrics=compute_metrics if training_args.predict_with_generate else None,
-    # )
-
-    trainer = Seq2SeqTrainer(
+    trainer = M2MSeq2SeqTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset_merge if training_args.do_train else None,
@@ -527,8 +482,7 @@ def main():
         logger.info("*** Evaluate ***")
 
         metrics = trainer.evaluate(max_length=max_length, num_beams=num_beams, metric_key_prefix="eval")
-        max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(
-            eval_dataset_merge)
+        max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset_merge)
         metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset_merge))
 
         trainer.log_metrics("eval", metrics)

@@ -40,6 +40,8 @@ wget  https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/acl2021/mrasp2/6
 #pip install jieba subword-nmt pythainlp sacremoses sacrebleu datasets tokenizers
 
 bash scripts/prep_multi.sh
+bash scripts/pipe.sh
+
 ```
 
 词表裁剪：

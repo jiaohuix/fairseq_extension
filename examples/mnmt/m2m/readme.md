@@ -27,12 +27,14 @@ pip install sacremoses sacrebleu tensorboardX  sacrebleu==1.5 apex fastcore omeg
 # 源码安装evaluate
 git clone https://github.com/huggingface/evaluate.git
 cd evaluate && pip install -e . && cd ..
+cp -r  evaluate/metrics/sacrebleu .
 
 conda update -n base -c defaults conda
 conda install packaging
 # https://github.com/NVIDIA/apex/issues/1594
 git clone https://github.com/NVIDIA/apex.git
 cd apex && pip install -e . && cd ..
+
 ```
 
 数据集：

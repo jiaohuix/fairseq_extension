@@ -27,7 +27,8 @@ import os
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
-
+from multiprocessing import Pool
+from functools import partial
 import datasets
 
 import pandas as pd
@@ -226,6 +227,83 @@ class DataTrainingArguments:
     )
 
 
+def process_lang_pair_dataset(lang_pair, data_args, model_args):
+    '''
+
+
+    Note: multiprocessing uses pickle, which can only serialize top-module level functions in general.
+    AttributeError: Can't pickle local object in Multiprocessing
+    https://stackoverflow.com/questions/72766345/attributeerror-cant-pickle-local-object-in-multiprocessing
+    '''
+    data_name_suffix = data_args.dataset_name.rstrip("/").split("/")[-1]
+    max_target_length = data_args.max_target_length
+    padding = "max_length" if data_args.pad_to_max_length else False
+    prefix = data_args.source_prefix if data_args.source_prefix is not None else ""
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+        cache_dir=model_args.cache_dir,
+        use_fast=model_args.use_fast_tokenizer,
+        revision=model_args.model_revision,
+        use_auth_token=True if model_args.use_auth_token else None,
+    )
+
+    source_lang = lang_pair.split('-')[0]
+    target_lang = lang_pair.split('-')[1]
+    tokenizer.src_lang = source_lang
+    tokenizer.tgt_lang = target_lang
+    forced_bos_token_id = tokenizer.lang_code_to_id[target_lang]
+
+    def preprocess_function(examples):
+        inputs = [ex[source_lang] for ex in examples["translation"]]
+        targets = [ex[target_lang] for ex in examples["translation"]]
+        inputs = [prefix + inp for inp in inputs]
+        model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
+
+        # Setup the tokenizer for targets
+        with tokenizer.as_target_tokenizer():
+            labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=True)
+
+        # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
+        # padding in the loss.
+        if padding == "max_length" and data_args.ignore_pad_token_for_loss:
+            labels["input_ids"] = [
+                [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
+            ]
+
+        model_inputs["labels"] = labels["input_ids"]
+        forced_bos_list = [forced_bos_token_id for i in range(len(model_inputs['labels']))]
+        model_inputs["forced_bos_token_id"] = forced_bos_list
+        return model_inputs
+
+    dataset_config_name = data_name_suffix + "-" + lang_pair
+
+    dataset = load_dataset(data_args.dataset_name, dataset_config_name, cache_dir="./datasets/",
+                           verification_mode="no_checks")
+
+    train_datasets, valid_datasets = dataset["train"], dataset["validation"]
+    # tokenize
+    lang = f'{source_lang}-{target_lang}'
+    column_names = train_datasets.column_names
+    train_datasets_token = train_datasets.map(
+        preprocess_function,
+        batched=True,
+        num_proc=data_args.preprocessing_num_workers,
+        remove_columns=column_names,
+        load_from_cache_file=not data_args.overwrite_cache,
+        desc=f"Running tokenizer on {lang} train dataset",
+    )
+    valid_datasets_token = valid_datasets.map(
+        preprocess_function,
+        batched=True,
+        num_proc=data_args.preprocessing_num_workers,
+        remove_columns=column_names,
+        load_from_cache_file=not data_args.overwrite_cache,
+        desc=f"Running tokenizer on {lang} valid dataset",
+    )
+    return train_datasets_token, valid_datasets_token
+
+
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -364,65 +442,14 @@ def main():
     else:
         lang_pairs = data_langs_map[data_name_suffix]
 
-    train_datasets_list = []
-    valid_datasets_list = []
-    for lang_pair in lang_pairs:
-        source_lang = lang_pair.split('-')[0]
-        target_lang = lang_pair.split('-')[1]
-        tokenizer.src_lang = source_lang
-        tokenizer.tgt_lang = target_lang
-        forced_bos_token_id = tokenizer.lang_code_to_id[target_lang]
+    # ========= parallel =========
+    logger.info(f"tokenize data")
 
-        def preprocess_function(examples):
-            inputs = [ex[source_lang] for ex in examples["translation"]]
-            targets = [ex[target_lang] for ex in examples["translation"]]
-            inputs = [prefix + inp for inp in inputs]
-            model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
+    with Pool(processes=len(lang_pairs)) as pool:
+        results = pool.map(
+            partial(process_lang_pair_dataset, data_args=data_args, model_args=model_args), lang_pairs)
 
-            # Setup the tokenizer for targets
-            with tokenizer.as_target_tokenizer():
-                labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=True)
-
-            # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
-            # padding in the loss.
-            if padding == "max_length" and data_args.ignore_pad_token_for_loss:
-                labels["input_ids"] = [
-                    [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
-                ]
-
-            model_inputs["labels"] = labels["input_ids"]
-            forced_bos_list = [forced_bos_token_id for i in range(len(model_inputs['labels']))]
-            model_inputs["forced_bos_token_id"] = forced_bos_list
-            return model_inputs
-
-        # load data
-        dataset_config_name = data_name_suffix + "-" + lang_pair
-
-        dataset = load_dataset(data_args.dataset_name, dataset_config_name, cache_dir="./datasets/",
-                               verification_mode="no_checks")
-
-        train_datasets, valid_datasets = dataset["train"], dataset["validation"]
-        # tokenize
-        lang = f'{source_lang}-{target_lang}'
-        column_names = train_datasets.column_names
-        train_datasets_token = train_datasets.map(
-            preprocess_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Running tokenizer on {lang} train dataset",
-        )
-        valid_datasets_token = valid_datasets.map(
-            preprocess_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Running tokenizer on {lang} valid dataset",
-        )
-        train_datasets_list.append(train_datasets_token)
-        valid_datasets_list.append(valid_datasets_token)
+    train_datasets_list, valid_datasets_list = zip(*results)
 
     ### create dataloaders
     train_dataset_merge = ConcatDataset(train_datasets_list)
@@ -431,6 +458,7 @@ def main():
     logger.info(f"eval_dataset size {len(eval_dataset_merge)}")
 
     # Data collator
+    logger.info(f"Collator data")
     label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     if data_args.pad_to_max_length:
         data_collator = default_data_collator
@@ -443,9 +471,10 @@ def main():
         )
 
     # Metric
+    logger.info(f"load metric")
     metric = evaluate.load("sacrebleu")
+    logger.info(f"load metric over")
 
-    print("load metric over.")
 
     def postprocess_text(preds, labels):
         preds = [pred.strip() for pred in preds]

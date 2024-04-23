@@ -25,12 +25,15 @@
 import logging
 import os
 import sys
+import math
 from dataclasses import dataclass, field
 from typing import Optional
 from multiprocessing import Pool
 from functools import partial
-import datasets
+from types import MethodType
 
+import torch
+import datasets
 import pandas as pd
 from datasets import Dataset
 import evaluate
@@ -104,6 +107,10 @@ class ModelArguments:
             "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
                     "with private models)."
         },
+    )
+    use_badam: bool = field(
+        default=True,
+        metadata={"help": "Whether to use BAdam or not."},
     )
 
 
@@ -475,7 +482,6 @@ def main():
     metric = evaluate.load("sacrebleu")
     logger.info(f"load metric over")
 
-
     def postprocess_text(preds, labels):
         preds = [pred.strip() for pred in preds]
         labels = [[label.strip()] for label in labels]
@@ -513,6 +519,57 @@ def main():
     #     data_collator=data_collator,
     #     compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     # )
+    optimizer = None
+    # optimizers = (None, None)
+    # if model_args.use_badam:
+    #     try:
+    #         from badam import BlockOptimizer
+    #     except ImportError:
+    #         # raise ImportError("Unable to import badam module. Please install badam or disable its usage.")
+    #         logger.info("Unable to import badam module. Please install badam or disable its usage.")
+    #
+    #     # Optimizer
+    #     # Split weights in two groups, one with weight decay and the other not.
+    #     no_decay = ["bias", "LayerNorm.weight", "layer_norm.weight"]
+    #     optimizer_grouped_parameters = [
+    #         {
+    #             "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+    #             "weight_decay": training_args.weight_decay,
+    #         },
+    #         {
+    #             "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+    #             "weight_decay": 0.0,
+    #         },
+    #     ]
+    #     original_optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=training_args.learning_rate)
+    #
+    #     # before training, add this line to wrap the original optimizer
+    #     optimizer = BlockOptimizer(
+    #         base_optimizer=original_optimizer,  # can be any torch.Optimizer
+    #         named_parameters_list=list(model.named_parameters()),
+    #         switch_block_every=100,
+    #         # switch to the new block every 50 updates, the $K$ Adam steps in paper. It can be set adaptively by $K = n/(BD)$, where $n$ is the number of training data points, $B$ is the batch size, and $D$ is the number of blocks in BAdam; see "Hyperparameter Suggestion" section for a detailed explaination about setting this hyperparameter.
+    #         switch_mode="random",
+    #         # update order of blocks, one can choose "random" (random reshuffling update order), "ascending" (update from input layer to output layer), or "descending" (update from output layer to input layer). The default is "random".
+    #         verbose=2,  # information level, will print trainable parameters when setting to 2
+    #         block_prefix_list = None
+    #     )
+
+        # # Scheduler and math around the number of training steps.
+        # overrode_max_train_steps = False
+        # num_update_steps_per_epoch = math.ceil(len(train_dataloader) / training_args.gradient_accumulation_steps) # train_dataloader获取不到
+        # if training_args.max_train_steps is None:
+        #     training_args.max_train_steps = training_args.num_train_epochs * num_update_steps_per_epoch
+        #     overrode_max_train_steps = True
+        #
+        # lr_scheduler = get_scheduler(
+        #     name=training_args.lr_scheduler_type,
+        #     optimizer=optimizer,
+        #     num_warmup_steps=training_args.num_warmup_steps,
+        #     num_training_steps=training_args.max_train_steps,
+        # )
+        #
+        # optimizers = (optimizer, lr_scheduler)
 
     trainer = Seq2SeqTrainer(
         model=model,
@@ -522,7 +579,36 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+        # optimizers = (optimizer, None)
     )
+
+    if model_args.use_badam:
+        try:
+            from badam import BlockOptimizer,clip_grad_norm_for_sparse_tensor
+
+        except ImportError:
+            # raise ImportError("Unable to import badam module. Please install badam or disable its usage.")
+            logger.info("Unable to import badam module. Please install badam or disable its usage.")
+
+        # Optimizer
+        trainer.create_optimizer_and_scheduler(num_training_steps=training_args.max_steps)
+        original_optimizer = trainer.optimizer
+
+        # before training, add this line to wrap the original optimizer
+        trainer.optimizer = BlockOptimizer(
+            base_optimizer=original_optimizer,  # can be any torch.Optimizer
+            named_parameters_list=list(model.named_parameters()),
+            switch_block_every=100,
+            # switch to the new block every 50 updates, the $K$ Adam steps in paper. It can be set adaptively by $K = n/(BD)$, where $n$ is the number of training data points, $B$ is the batch size, and $D$ is the number of blocks in BAdam; see "Hyperparameter Suggestion" section for a detailed explaination about setting this hyperparameter.
+            switch_mode="random",
+            # update order of blocks, one can choose "random" (random reshuffling update order), "ascending" (update from input layer to output layer), or "descending" (update from output layer to input layer). The default is "random".
+            verbose=2,  # information level, will print trainable parameters when setting to 2
+            block_prefix_list = None
+        )
+
+        trainer.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_for_sparse_tensor, trainer.accelerator)
+
+
 
     # Training
     if training_args.do_train:

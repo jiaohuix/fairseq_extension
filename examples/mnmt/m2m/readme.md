@@ -141,3 +141,14 @@ results = translator.translate_batch([tokenize(input)], beam_size=1)
 print(detokenize(results[0].hypotheses[0]))
 translator = ctranslate2.Translator(model_path, device="cpu", intra_threads=8)
 ```
+
+
+
+badam加速：
+
+```shell
+git clone git@github.com:Ledzy/BAdam.git
+cd BAdam
+pip install -e .
+```
+

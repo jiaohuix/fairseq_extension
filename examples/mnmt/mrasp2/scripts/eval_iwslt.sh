@@ -1,13 +1,12 @@
-ckpt=${1:-"ckpt/6e6d_no_mono.pt"}
-ckpt_dir=${2:-"ckpt/"}
-dataset=datasets/ikcest2022
-data_outdir=train_data
-wandb_proj=ikcest2022
-lang_pairs=("zh-th" "th-zh" "zh-fr" "fr-zh" "zh-ru" "ru-zh" "zh-ar" "ar-zh")
-#dual_lang_pairs=( "zh-th" "zh-fr" "zh-ru" "zh-ar" )
-
+dataset=datasets/iwslt2017
+wandb_proj=iwslt2017
+lang_pairs=( "it-en" "en-it" "ro-en"  "en-ro" "nl-en" "en-nl"  "it-ro" "ro-it")
+ckpt=ckpt/${wandb_proj}_multi/
 report_dir=ckpt/${wandb_proj}_multi/report
+mkdir -p $report_dir
 
+ckpt=ckpt/${wandb_proj}_multi/
+report_dir=ckpt/${wandb_proj}_multi/report
 mkdir -p $report_dir
 
 # eval each pair
@@ -19,7 +18,7 @@ do
     echo "Source language: $src_lang"
     echo "Target language: $tgt_lang"
 
-    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${lang_pair} $ckpt > $ckpt_dir/gen_${lang_pair}.txt
+    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${lang_pair} $ckpt/checkpoint_best.pt > $ckpt_dir/gen_${lang_pair}.txt
 
     # report
     hypo_file=$report_dir/${src_lang}_${tgt_lang}.rst
@@ -32,3 +31,4 @@ do
     echo "$lang_pair,$score,$ref_len,$hypo_len" >> $report_dir/bleu.txt
 
 done
+

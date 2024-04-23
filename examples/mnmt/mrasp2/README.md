@@ -50,6 +50,89 @@ python trim_dict.py --model-path ckpt/6e6d_no_mono.pt --pt-dict dict/bpe_vocab.t
 
 
 
+zhru测试集长度不一致问题：
+
+938行缺了下面这句话：
+
+```shell
+'translation': {'ru': 'Однако они подчеркнули, что это было вполне объяснимое убийство из мести и что они не получили одобрения лидеров движения.', 'zh': '然而，他们强调说，这属于可以理解的报复性杀人，他们并未得到该运动领导人的批准。'}}
+```
+
+
+
+
+
+```python
+!pip install datasets sacremoses subword-nmt jieba
+
+import jieba
+from subword_nmt import subword_nmt
+from sacremoses import MosesTokenizer, MosesDetokenizer, MosesTruecaser, MosesDetruecaser
+from datasets import load_dataset
+
+class MultilingualTokenizer:
+    def __init__(self, codes_file):
+        self.moses_tokenizer = MosesTokenizer()
+        bpe_parser = subword_nmt.create_apply_bpe_parser()
+        bpe_args = bpe_parser.parse_args(args=['-c', codes_file])
+        self.bpe = subword_nmt.BPE(bpe_args.codes, bpe_args.merges,
+                                   bpe_args.separator, None,
+                                   bpe_args.glossaries)
+
+    def tokenize(self, text, lang="en", return_str=False):
+        if lang == 'zh':
+            tokens = jieba.lcut(text)
+        else:
+            self.moses_tokenizer.lang = lang
+            tokens = self.moses_tokenizer.tokenize(text)
+        # bpe
+        bpe_str = self.bpe.process_line(" ".join(tokens))
+        return bpe_str
+
+data = load_dataset("miugod/ikcest2022","ikcest2022-zh-ru",verification_mode="no_checks")
+test_data = data["test"]
+print(test_data[937])
+
+```
+
+分词+bpe
+
+```shell
+echo 'Однако они подчеркнули, что это было вполне объяснимое убийство из мести и что они не получили одобрения лидеров движения.' |sacremoses -l ru -j 4 tokenize | subword-nmt apply-bpe -c dict/codes.bpe.32000.txt 
+
+echo "然而，他们强调说，这属于可以理解的报复性杀人，他们并未得到该运动领导人的批准。" | python -m jieba |sed "s/\///g" | subword-nmt apply-bpe -c dict/codes.bpe.32000.txt
+
+```
+
+结果：
+
+```
+LANG_TOK_RU Одна@@ ко они под@@ чер@@ кну@@ ли , что это было в@@ пол@@ не объ@@ я@@ сни@@ мо@@ е уби@@ й@@ ство из ме@@ сти и что они не получи@@ ли о@@ доб@@ ре@@ ния ли@@ де@@ ров дви@@ жения .
+
+LANG_TOK_ZH 然@@ 而 ， 他们 强@@ 调 说 ， 这 属@@ 于 可以 理@@ 解 的 报@@ 复@@ 性 杀@@ 人 ， 他们 并@@ 未 得到 该 运@@ 动 领@@ 导@@ 人 的 批@@ 准 。
+
+```
+
+插入：
+
+```SHELL
+sed -i '938i\LANG_TOK_ZH 然@@ 而 ， 他们 强@@ 调 说 ， 这 属@@ 于 可以 理@@ 解 的 报@@ 复@@ 性 杀@@ 人 ， 他们 并@@ 未 得到 该 运@@ 动 领@@ 导@@ 人 的 批@@ 准 。'  train_data/ikcest2022/zh-ru/test.src
+
+sed -i '938i\LANG_TOK_RU Одна@@ ко они под@@ чер@@ кну@@ ли , что это было в@@ пол@@ не объ@@ я@@ сни@@ мо@@ е уби@@ й@@ ство из ме@@ сти и что они не получи@@ ли о@@ доб@@ ре@@ ния ли@@ де@@ ров дви@@ жения .'  train_data/ikcest2022/zh-ru/test.tgt
+```
+
+重写bin
+
+```shell
+rm -r data-bin/ikcest2022/zh-ru
+bash scripts/bin.sh train_data/ikcest2022/zh-ru/ data-bin/ikcest2022/zh-ru src tgt 1 dict/bpe_vocab.txt 
+
+# eval
+bash scripts/eval.sh zh ru data-bin/ikcest2022/zh-ru/ ckpt/ikcest2022_multi/checkpoint_best.pt 
+```
+
+
+
 ## Training Data and Checkpoints
 
 We release our preprocessed training data and checkpoints in the following.

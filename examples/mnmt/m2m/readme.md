@@ -13,3 +13,57 @@ eval.py
 压缩提交文件
 
 submit.py
+
+
+
+环境：
+
+```shell
+conda create -n nmt python=3.10
+conda activate nmt
+
+pip install sacremoses sacrebleu tensorboardX  sacrebleu==1.5 apex fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt transformers accelerate protobuf py7zr torch -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 源码安装evaluate
+git clone https://github.com/huggingface/evaluate.git
+cd evaluate && pip install -e . && .
+
+```
+
+模型：
+
+```shell
+# m2m 
+mkdir models && cd models
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/facebook/m2m100_418M
+wget https://hf-mirror.com/facebook/m2m100_418M/resolve/main/pytorch_model.bin?download=true -O "m2m100_418M/pytorch_model.bin"
+
+wget https://hf-mirror.com/facebook/m2m100_418M/resolve/main/sentencepiece.bpe.model?download=true  -O "m2m100_418M/sentencepiece.bpe.model"
+
+# m2m 1.2B
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/facebook/m2m100_1.2B
+wget https://hf-mirror.com/facebook/m2m100_1.2B/resolve/main/pytorch_model.bin?download=true -O "m2m100_1.2B/pytorch_model.bin"
+
+wget https://hf-mirror.com/facebook/m2m100_1.2B/resolve/main/sentencepiece.bpe.model?download=true?download=true  -O "m2m100_1.2B/sentencepiece.bpe.model"
+
+
+# mbart
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/facebook/mbart-large-cc25
+wget https://hf-mirror.com/facebook/mbart-large-cc25/resolve/main/pytorch_model.bin?download=true -O "mbart-large-cc25/pytorch_model.bin"
+
+# mt5
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/google/mt5-base
+wget https://hf-mirror.com/google/mt5-base/resolve/main/pytorch_model.bin?download=true
+ -O "mt5-base/pytorch_model.bin"
+
+# nllb 1.3B
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/facebook/nllb-200-distilled-1.3B
+wget https://hf-mirror.com/facebook/nllb-200-distilled-1.3B/resolve/main/pytorch_model.bin?download=true -O "nllb-200-distilled-1.3B/pytorch_model.bin"
+
+wget https://hf-mirror.com/facebook/nllb-200-distilled-1.3B/resolve/main/sentencepiece.bpe.model?download=true -O "sentencepiece.bpe.model"
+
+wget https://hf-mirror.com/facebook/nllb-200-distilled-1.3B/resolve/main/tokenizer.json?download=true -O "nllb-200-distilled-1.3B/tokenizer.json"
+
+
+# todo: 熟悉hf-mirror.com的下载脚本
+```
+

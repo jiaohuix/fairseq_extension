@@ -14,7 +14,7 @@ export WANDB_PROJECT=m2m_ft
 # --lang_pairs zh-fr,zh-th
 
 
-python scripts/run_translation_ikcest.py \
+python scripts/run_translation.py \
   --model_name_or_path $model_path \
   --per_device_train_batch_size 16 --per_device_eval_batch_size 4 \
   --gradient_accumulation_steps 2  --warmup_steps 4000 \

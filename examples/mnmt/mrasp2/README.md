@@ -50,7 +50,21 @@ python trim_dict.py --model-path ckpt/6e6d_no_mono.pt --pt-dict dict/bpe_vocab.t
 
 
 
-zhru测试集长度不一致问题：
+问题1：generate忘了加moses detok
+
+```shell
+git clone https://gitee.com/miugod/nmt_data_tools.git
+export TOOLS=$PWD/nmt_data_tools/
+export scripts=nmt_data_tools/mosesdecoder/scripts/
+perl $scripts/tokenizer/detokenizer.perl -l fr < zh_fr.rst > zh_fr.rst.detok
+perl $scripts/tokenizer/detokenizer.perl -l ru < zh_ru.rst > zh_ru.rst.detok
+mv zh_fr.rst.detok zh_fr.rst
+mv zh_ru.rst.detok zh_ru.rst
+```
+
+
+
+问题2：zhru测试集长度不一致问题：
 
 938行缺了下面这句话：
 

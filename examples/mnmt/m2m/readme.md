@@ -98,3 +98,44 @@ wget https://hf-mirror.com/facebook/nllb-200-distilled-1.3B/resolve/main/tokeniz
 bash scripts/train.sh
 ```
 
+
+
+
+
+推理加速
+
+todo: predict改为ctranslate2	
+
+```shell
+pip install ctranslate2 
+ct2-transformers-converter --model models/m2m100_418M --output_dir ct_m2m100_418
+# https://opennmt.net/CTranslate2/guides/transformers.html#m2m-100
+```
+
+
+
+```python
+import ctranslate2
+import transformers
+
+translator = ctranslate2.Translator("ct_m2m100_418")
+tokenizer = transformers.AutoTokenizer.from_pretrained("models/m2m100_418M")
+tokenizer.src_lang = "en"
+
+source = tokenizer.convert_ids_to_tokens(tokenizer.encode("Hello world!"))
+target_prefix = [tokenizer.lang_code_to_token["de"]]
+results = translator.translate_batch([source], target_prefix=[target_prefix])
+target = results[0].hypotheses[0][1:]
+
+print(tokenizer.decode(tokenizer.convert_tokens_to_ids(target)))
+```
+
+？int8+vmap
+
+```
+--quantization int8
+translator = ctranslate2.Translator(model_path, compute_type="int8")
+results = translator.translate_batch([tokenize(input)], beam_size=1)
+print(detokenize(results[0].hypotheses[0]))
+translator = ctranslate2.Translator(model_path, device="cpu", intra_threads=8)
+```

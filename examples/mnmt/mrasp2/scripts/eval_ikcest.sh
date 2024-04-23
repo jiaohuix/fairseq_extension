@@ -3,7 +3,7 @@ wandb_proj=ikcest2022
 data_outdir=train_data
 lang_pairs=("fr-zh" "zh-fr" "ru-zh" "zh-ru"  "th-zh" "zh-th" "ar-zh"  "zh-ar" )
 
-ckpt=ckpt/${wandb_proj}_multi/
+ckpt_dir=ckpt/${wandb_proj}_multi/
 report_dir=ckpt/${wandb_proj}_multi/report
 mkdir -p $report_dir
 
@@ -16,12 +16,16 @@ do
     echo "Source language: $src_lang"
     echo "Target language: $tgt_lang"
 
-    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${lang_pair} $ckpt/checkpoint_best.pt > $ckpt_dir/gen_${lang_pair}.txt
+    bash scripts/eval.sh $src_lang $tgt_lang data-bin/${wandb_proj}/${lang_pair} $ckpt_dir/checkpoint_best.pt > $ckpt_dir/gen_${lang_pair}.txt
 
     # report
     hypo_file=$report_dir/${src_lang}_${tgt_lang}.rst
+    ref_file=$report_dir/${src_lang}_${tgt_lang}.ref
     cat $ckpt_dir/gen_${lang_pair}.txt | grep -P "^D" | sort -V | cut -f 3-  | sed "s/$tgt_lang_id //g"   > $hypo_file
+    cat $ckpt_dir/gen_${lang_pair}.txt | grep -P "^T" | sort -V | cut -f 2-  | sed "s/$tgt_lang_id //g"   > $ref_file
     sed -i "s/<unk>//g" $hypo_file
+    sed -i "s/<unk>//g" $ref_file
+
     score=$(tail "$ckpt_dir/gen_${lang_pair}.txt" | sed "s/,//" | grep "BLEU" | cut -d' ' -f7)
     # 获取长度
     ref_len=$(wc -l < $data_outdir/${wandb_proj}/$lang_pair/test.${tgt_lang})

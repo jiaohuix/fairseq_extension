@@ -125,10 +125,11 @@ sed -i '938i\LANG_TOK_RU Одна@@ ко они под@@ чер@@ кну@@ ли 
 
 ```shell
 rm -r data-bin/ikcest2022/zh-ru
-bash scripts/bin.sh train_data/ikcest2022/zh-ru/ data-bin/ikcest2022/zh-ru src tgt 1 dict/bpe_vocab.txt 
+bash scripts/bin.sh train_data/ikcest2022/zh-ru/ data-bin/ikcest2022/zh-ru src tgt 1 data-bin/ikcest2022_multi/dict.src.txt
 
 # eval
-bash scripts/eval.sh zh ru data-bin/ikcest2022/zh-ru/ ckpt/ikcest2022_multi/checkpoint_best.pt 
+bash scripts/eval.sh zh ru data-bin/ikcest2022/zh-ru/ ckpt/ikcest2022_multi/checkpoint_best.pt > zh_ru.tst
+
 ```
 
 

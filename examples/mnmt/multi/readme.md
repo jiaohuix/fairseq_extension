@@ -54,3 +54,26 @@ bash scripts/train_6layer.sh src tgt data-bin/ikcest2022_multi/ ckpt/ikest2022_m
 bash scripts/train_6layer.sh src tgt data-bin/iwslt2017_multi/ ckpt/iwslt2017_multi  iwslt2017
 ```
 
+
+
+zhru test缺了一行：
+
+```shell
+echo 'Однако они подчеркнули, что это было вполне объяснимое убийство из мести и что они не получили одобрения лидеров движения.' |sacremoses -l ru -j 4 tokenize | subword-nmt apply-bpe -c  train_data/ikcest2022/zh-ru/codes.txt
+
+echo "然而，他们强调说，这属于可以理解的报复性杀人，他们并未得到该运动领导人的批准。" | python -m jieba |sed "s/\///g" | subword-nmt apply-bpe -c  train_data/ikcest2022/zh-ru/codes.txt
+
+
+sed -i '938i\<to_ru> 然而 ， 他们 强调 说 ， 这 属于 可以 理解 的 报@@ 复@@ 性 杀@@ 人 ， 他们 并未 得到 该 运动 领导人 的 批准 。' train_data/ikcest2022/zh-ru/test.src
+sed -i '938i\Однако они подчеркну@@ ли , что это было вполне объя@@ сни@@ мое убий@@ ство из ме@@ сти и чт/ikcest2022/zh-ru/test.tgt
+
+rm -r data-bin/ikcest2022/zh-ru
+bash scripts/bin.sh train_data/ikcest2022/zh-ru/ data-bin/ikcest2022/zh-ru src tgt 1 dict/bpe_vocab.txt 
+
+# eval
+bash scripts/eval.sh zh ru data-bin/ikcest2022/zh-ru/ ckpt/ikcest2022_multi/checkpoint_best.pt > ckpt/ikcest2022_multi/gen_zh-ru.txt
+
+
+cat ckpt/ikcest2022_multi/gen_zh-ru.txt | grep -P "^D" | sort -V | cut -f 3- > ckpt/ikcest2022_multi/report/zh_ru.rst
+```
+

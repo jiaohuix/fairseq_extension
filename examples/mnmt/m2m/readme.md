@@ -29,6 +29,23 @@ cd evaluate && pip install -e . && .
 
 ```
 
+数据集：
+
+```shell
+mkdir datasets && cd datasets
+# iwslt17
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/datasets/iwslt2017
+wget https://hf-mirror.com/datasets/iwslt2017/resolve/main/data/2017-01-trnmted/texts/DeEnItNlRo/DeEnItNlRo/DeEnItNlRo-DeEnItNlRo.zip?download=true -O "iwslt2017/data/2017-01-trnmted/texts/DeEnItNlRo/DeEnItNlRo/DeEnItNlRo-DeEnItNlRo.zip"
+sed -i '50s#.*#REPO_URL = ""#' iwslt2017/iwslt2017.py
+
+
+# ikcest22
+GIT_LFS_SKIP_SMUDGE=1 git clone https://hf-mirror.com/datasets/miugod/ikcest2022
+wget https://hf-mirror.com/datasets/miugod/ikcest2022/resolve/main/data/ZhFrRuThArEn.zip?download=true  -O "ZhFrRuThArEn.zip"
+cp ZhFrRuThArEn.zip ikcest2022/data/ZhFrRuThArEn.zip
+
+```
+
 模型：
 
 ```shell
@@ -65,5 +82,13 @@ wget https://hf-mirror.com/facebook/nllb-200-distilled-1.3B/resolve/main/tokeniz
 
 
 # todo: 熟悉hf-mirror.com的下载脚本
+```
+
+
+
+训练：
+
+```
+bash scripts/train.sh
 ```
 

@@ -22,11 +22,17 @@ submit.py
 conda create -n nmt python=3.10
 conda activate nmt
 
-pip install sacremoses sacrebleu tensorboardX  sacrebleu==1.5 apex fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt transformers accelerate protobuf py7zr torch -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install sacremoses sacrebleu tensorboardX  sacrebleu==1.5 apex fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt transformers[torch] accelerate protobuf py7zr torch -i https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 源码安装evaluate
 git clone https://github.com/huggingface/evaluate.git
-cd evaluate && pip install -e . && .
+cd evaluate && pip install -e . && cd ..
 
+conda update -n base -c defaults conda
+conda install packaging
+# https://github.com/NVIDIA/apex/issues/1594
+git clone https://github.com/NVIDIA/apex.git
+cd apex && pip install -e . && cd ..
 ```
 
 数据集：

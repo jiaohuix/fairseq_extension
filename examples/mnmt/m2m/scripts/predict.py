@@ -2,10 +2,13 @@ import time
 import argparse
 import logging
 import json
+import os
 
 import pandas as pd
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+# 设置环境变量
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 logger = logging.getLogger("traslation")
 
@@ -15,12 +18,6 @@ def read_lines(infile):
     return lines
 
 def main(args):
-    # tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    print("Loading model...")
-    start = time.time()
-    translation_pipeline = pipeline('translation', args.model_path, src_lang='zh', tgt_lang="en", device=0)
-    load_time = time.time() - start
-    print(f"Load {load_time} secs.")
 
     print("Loading data...")
     data_name_suffix = args.dataset_name.rstrip("/").split("/")[-1]
@@ -44,6 +41,9 @@ def main(args):
     else:
         lang_pairs = data_langs_map[data_name_suffix]
 
+
+
+
     df_data = []
     for lang_pair in lang_pairs:
         source_lang = lang_pair.split('-')[0]
@@ -53,8 +53,9 @@ def main(args):
 
         tst_dataset = load_dataset(args.dataset_name, dataset_config_name, cache_dir="./datasets/",
                                verification_mode="no_checks")["test"]
+
+        print(tst_dataset)
         for data in tst_dataset:
-            data = data["translation"]
             source_text = data["translation"][source_lang]
             target_text = data["translation"][target_lang]
             new_data = {"src_lang": source_lang, "tgt_lang": target_lang, "src": source_text, "ref": target_text}
@@ -62,6 +63,13 @@ def main(args):
 
     df = pd.DataFrame(df_data)
     df['lang_dir'] = df['src_lang'] + '-' + df['tgt_lang']
+
+    # tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    print("Loading model...")
+    start = time.time()
+    translation_pipeline = pipeline('translation', args.model_path, src_lang='zh', tgt_lang="en", device=0)
+    load_time = time.time() - start
+    print(f"Load {load_time} secs.")
 
     df_ls = []
     # todo 1 在上一步完成推理 2 指定lang_pairs

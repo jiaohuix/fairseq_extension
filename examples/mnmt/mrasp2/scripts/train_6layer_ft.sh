@@ -9,7 +9,7 @@ DATA=$3
 SAVE=$4
 wandb_project=${5:-"ikcest22"}
 CKPT=${6:-"ckpt/6e6d_no_mono.pt"}
-epoch=${7:-"5"}
+epoch=${7:-"10"}
 
 mkdir -p $SAVE
 

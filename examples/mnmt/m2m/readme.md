@@ -108,6 +108,30 @@ bash scripts/train.sh
 
 推理加速
 
+```
+# eval
+
+
+
+sed -i '943s#.*#  "num_madeup_words": 0,#' ckpt/ikcest_mft_luchen/checkpoint-20000/tokenizer_config.json
+/root/.local/bin/ct2-transformers-converter --model ckpt/ikcest_mft_luchen/checkpoint-20000/  --output_dir ckpt/ct2_m2m --force
+
+
+time python scripts/predict_ct2.py -d datasets/ikcest2022 -o output/ikcest_m2m_ct2.jsonl -m ckpt/ct2_m2m -n m2m_ct2 -b 64 -l 400 
+
+#16 58s 6.5~6.9g vram  1MIN18S
+
+
+# INT8 58S 2G-8G 
+/root/.local/bin/ct2-transformers-converter --quantization int8 --model ckpt/ikcest_mft_luchen/checkpoint-20000/  --output_dir ckpt/ct2_m2m_q8 --force 
+time python scripts/predict_ct2.py -d datasets/ikcest2022 -o output/ikcest_m2m_ct2_q8.jsonl -m  ckpt/ct2_m2m_q8 -n m2m_ct2_q8 -b 64 -l 400 
+
+cat output/ikcest_m2m*.jsonl > ikcest.jsonl
+python scripts/eval.py ikcest.jsonl report.csv
+```
+
+
+
 todo: predict改为ctranslate2	
 
 ```shell
@@ -156,6 +180,59 @@ pip install -e .
 
 
 
+## 2 eval
+
+transformers原生fp16推理，保存到ikcest_m2m.jsonl
+
+```shell
+mkdir output
+time python scripts/predict.py -d datasets/ikcest2022 -o output/ikcest_m2m.jsonl -m ckpt/ikcest_mft_luchen/checkpoint-20000/ -n m2m -b 8 -l 400 
+# bsz=8 8g vram
+```
+
+ctranslate fp16，保存结果到ikcest_m2m_ct2.jsonl
+
+```shell
+# 删除词表中的特殊词num_madeup_words（没有微调的模型不需要调整词表）
+sed -i '943s#.*#  "num_madeup_words": 0,#' ckpt/ikcest_mft_luchen/checkpoint-20000/tokenizer_config.json
+
+/root/.local/bin/ct2-transformers-converter --model ckpt/ikcest_mft_luchen/checkpoint-20000/  --output_dir ckpt/ct2_m2m --force
+time python scripts/predict_ct2.py -d datasets/ikcest2022 -o output/ikcest_m2m_ct2.jsonl -m ckpt/ct2_m2m -n m2m_ct2 -b 64 -l 400 
+```
+
+ctranslate int8，保存结果到ikcest_m2m_ct2_q8.jsonl
+
+```shell
+/root/.local/bin/ct2-transformers-converter --quantization int8 --model ckpt/ikcest_mft_luchen/checkpoint-20000/  --output_dir ckpt/ct2_m2m_q8 --force 
+time python scripts/predict_ct2.py -d datasets/ikcest2022 -o output/ikcest_m2m_ct2_q8.jsonl -m  ckpt/ct2_m2m_q8 -n m2m_ct2_q8 -b 64 -l 400 
+
+```
+
+合并三个模型的结果，并汇报分数：
+
+```SHELL
+cat output/ikcest_m2m*.jsonl > ikcest.jsonl
+python scripts/eval.py ikcest.jsonl report.csv
+```
+
+结果如下：
+
+| model        | AVG. BLEU | Speed    | VRAM      | Model Size |
+| ------------ | --------- | -------- | --------- | ---------- |
+| m2m_ct2_fp16 | 28.53     | 58s      | 7G/64bsz  | 1.9G       |
+| m2m          | 28.953    | 13min30s | 18G/8bsz  | 1.9G       |
+| m2m_ct2_int8 | 29.4      | 78s      | ≈8G/64bsz | 471M       |
+
+
+
+## 3 submit
+
+打包预测结果并提交：
+
+```shell
+python scripts/submit.py -i output/ikcest_m2m.jsonl -o results
+```
+
 
 
 ## bugs
@@ -176,6 +253,8 @@ root/.local/bin/ct2-transformers-converter --model ckpt/ikcest_mft_luchen/checkp
 ```
 
 
+
+###  2 badam错误
 
 
 

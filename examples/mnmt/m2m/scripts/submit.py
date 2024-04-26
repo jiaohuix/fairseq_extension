@@ -1,6 +1,10 @@
 import json
 import os
 import sys
+import shutil
+import argparse
+# 打包rst文件为zip文件
+import zipfile
 
 # 定义需要处理的源语言和目标语言对
 lang_pairs = {
@@ -47,14 +51,7 @@ def main(jsonl_path, rst_folder):
     save_translations_to_rst(jsonl_path, rst_folder)
 
 
-# 假设jsonl文件名为translations.jsonl，rst文件保存在results文件夹中
-jsonl_path = sys.argv[1]
-rst_folder = 'results'
-main(jsonl_path, rst_folder)
 
-# 打包rst文件为zip文件
-import os
-import zipfile
 
 
 def zip_rst_files(rst_folder, zip_filename):
@@ -67,6 +64,24 @@ def zip_rst_files(rst_folder, zip_filename):
 
                 # 压缩rst文件为zip
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Translate texts using m2m100 model and save results to a JSON file")
+    parser.add_argument("-i","--infile", type=str, default=None, help="pred file path(predict.py output jsonl fine)")
+    parser.add_argument("-o","--outdir", type=str, default="results", help="Output dir")
+    args = parser.parse_args()
+    
 
-zip_filename = 'trans_result.zip'
-zip_rst_files(rst_folder, zip_filename)
+    # 假设jsonl文件名为translations.jsonl，rst文件保存在results文件夹中
+    jsonl_path = args.infile
+    rst_folder = args.outdir
+    # 创建输出目录
+    if not os.path.exists(rst_folder):
+        os.makedirs(rst_folder)
+    else:
+        # 如果目录存在，清空目录内容
+        shutil.rmtree(rst_folder)
+        os.makedirs(rst_folder)
+    main(jsonl_path, rst_folder)
+    zip_filename = os.path.join(rst_folder,os.path.basename(args.outdir) + ".zip")
+    zip_rst_files(rst_folder, zip_filename)
+    

@@ -14,6 +14,8 @@ eval.py
 
 submit.py
 
+## 1 train
+
 
 
 环境：
@@ -22,7 +24,7 @@ submit.py
 conda create -n nmt python=3.10
 conda activate nmt
 
-pip install sacremoses sacrebleu tensorboardX  sacrebleu==1.5 apex fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt transformers[torch] accelerate protobuf py7zr torch -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install sacremoses sacrebleu==2.4.2 tensorboardX  apex fastcore omegaconf jieba  sentencepiece pythainlp datasets tokenizers wandb subword-nmt transformers[torch] accelerate protobuf py7zr torch -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 源码安装evaluate
 git clone https://github.com/huggingface/evaluate.git
@@ -151,4 +153,31 @@ git clone git@github.com:Ledzy/BAdam.git
 cd BAdam
 pip install -e .
 ```
+
+
+
+
+
+## bugs
+
+### 1 ctranslate转换错误
+
+ValueError: Source vocabulary 0 has size 128112 but the model expected a vocabulary of size 128104
+
+因为有madeupword=8，额外添加了8个特殊标记，导致词表与模型嵌入的128104匹配不上。
+
+```
+sed -i '943s#.*#  "num_madeup_words": 0,#' ckpt/ikcest_mft_luchen/checkpoint-20000/tokenizer_config.json
+
+
+
+
+root/.local/bin/ct2-transformers-converter --model ckpt/ikcest_mft_luchen/checkpoint-20000/  --output_dir ckpt/ct2_m2m_zhfr --force
+```
+
+
+
+
+
+
 

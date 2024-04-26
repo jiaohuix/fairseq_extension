@@ -19,19 +19,23 @@
 { "translation": { "en": "Others have dismissed him as a joke.", "ro": "Alții l-au numit o glumă." }}
 { "translation": { "en": "And some are holding out for an implosion.", "ro": "Iar alții așteaptă implozia." }}
 
+自己写trainer。然后套上badam
+
 
 """
 import logging
 import os
 import sys
 import math
+import inspect
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List,Literal,Union
 from multiprocessing import Pool
 from functools import partial
 from types import MethodType
 
 import torch
+import torch.nn as nn
 import datasets
 import pandas as pd
 from datasets import Dataset
@@ -40,6 +44,8 @@ import numpy as np
 from datasets import load_dataset, load_metric
 
 import transformers
+from transformers.trainer_pt_utils import get_parameter_names
+from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 from transformers import (
     AutoConfig,
     AutoModelForSeq2SeqLM,
@@ -51,6 +57,7 @@ from transformers import (
     MBart50TokenizerFast,
     MBartTokenizer,
     MBartTokenizerFast,
+    Trainer,
     Seq2SeqTrainer,
     # M2MSeq2SeqTrainer,
     Seq2SeqTrainingArguments,
@@ -107,10 +114,7 @@ class ModelArguments:
                     "with private models)."
         },
     )
-    use_badam: bool = field(
-        default=True,
-        metadata={"help": "Whether to use BAdam or not."},
-    )
+
 
 
 @dataclass
@@ -232,6 +236,57 @@ class DataTrainingArguments:
         },
     )
 
+@dataclass
+class BAdamSeq2SeqTrainingArguments(Seq2SeqTrainingArguments):
+    r"""
+    Arguments pertaining to the BAdam optimizer.
+    """
+
+    use_badam: bool = field(
+        default=False,
+        metadata={"help": "Whether or not to use the BAdam optimizer."},
+    )
+    badam_mode: Literal["layer", "ratio"] = field(
+        default="layer",
+        metadata={"help": "Whether to use layer-wise or ratio-wise BAdam optimizer."},
+    )
+    badam_start_block: Optional[int] = field(
+        default=None,
+        metadata={"help": "The starting block index for layer-wise BAdam."},
+    )
+    badam_switch_block_every: Optional[int] = field(
+        default=50,
+        metadata={"help": "How often to switch model's block update. Set to -1 to disable the block update."},
+    )
+    badam_switch_mode: Optional[Literal["ascending", "descending", "random", "fixed"]] = field(
+        default="ascending",
+        metadata={"help": "the strategy of picking block to update for layer-wise BAdam."},
+    )
+    badam_update_ratio: float = field(
+        default=0.0,
+        metadata={"help": "The ratio of the update for ratio-wise BAdam."},
+    )
+    badam_mask_mode: Literal["adjacent", "scatter"] = field(
+        default="adjacent",
+        metadata={
+            "help": """The mode of the mask for BAdam optimizer. \
+                    `adjacent` means that the trainable parameters are adjacent to each other, \
+                    `scatter` means that trainable parameters are randomly choosed from the weight."""
+        },
+    )
+    badam_verbose: int = field(
+        default=0,
+        metadata={
+            "help": """The verbosity level of BAdam optimizer. \
+                    0 for no print, 1 for print the block prefix, 2 for print trainable parameters"""
+        },
+    )
+
+
+    generation_config: str = field(
+        default= None,
+        metadata={"help": "Allows to load a GenerationConfig from the from_pretrained method. This can be either:"}
+    )
 
 def process_lang_pair_dataset(lang_pair, data_args, model_args):
     '''
@@ -309,6 +364,14 @@ def process_lang_pair_dataset(lang_pair, data_args, model_args):
     )
     return train_datasets_token, valid_datasets_token
 
+def _get_decay_parameter_names(model: "PreTrainedModel") -> List[str]:
+    r"""
+    Returns a list of names of parameters with weight decay. (weights in non-layernorm layers)
+    """
+    decay_parameters = get_parameter_names(model, ALL_LAYERNORM_LAYERS)
+    decay_parameters = [name for name in decay_parameters if "bias" not in name]
+    return decay_parameters
+
 def gradient_checkpointing_enable(
     self: "PreTrainedModel", gradient_checkpointing_kwargs: Optional[Dict[str, Any]] = None
 ) -> None:
@@ -344,13 +407,133 @@ def gradient_checkpointing_enable(
     else:  # have already enabled input require gradients
         self._set_gradient_checkpointing(enable=True, gradient_checkpointing_func=custom_gradient_checkpointing_func)
 
+def _create_badam_optimizer(
+    model: "PreTrainedModel",
+    training_args: "BAdamSeq2SeqTrainingArguments",
+) -> "torch.optim.Optimizer":
+    decay_params, nodecay_params = [], []
+    decay_param_names = _get_decay_parameter_names(model)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            if name in decay_param_names:
+                decay_params.append(param)
+            else:
+                nodecay_params.append(param)
+
+    optim_class, optim_kwargs = Trainer.get_optimizer_cls_and_kwargs(training_args)
+    param_groups = [
+        dict(params=nodecay_params, weight_decay=0.0),
+        dict(params=decay_params, weight_decay=training_args.weight_decay),
+    ]
+
+    if training_args.badam_mode == "layer":
+        from badam import BlockOptimizer
+
+        base_optimizer = optim_class(param_groups, **optim_kwargs)
+        optimizer = BlockOptimizer(
+            base_optimizer=base_optimizer,
+            named_parameters_list=list(model.named_parameters()),
+            block_prefix_list=None,
+            switch_block_every=training_args.badam_switch_block_every,
+            start_block=training_args.badam_start_block,
+            switch_mode=training_args.badam_switch_mode,
+            verbose=training_args.badam_verbose,
+        )
+        logger.info(
+            f"Using BAdam optimizer with layer-wise update, switch mode is {training_args.badam_switch_mode}, "
+            f"switch block every {training_args.badam_switch_block_every} steps, "
+            f"default start block is {training_args.badam_start_block}"
+        )
+
+    elif training_args.badam_mode == "ratio":
+        from badam import BlockOptimizerRatio
+
+        assert training_args.badam_update_ratio > 1e-6
+        optimizer = BlockOptimizerRatio(
+            param_groups=param_groups,
+            named_parameters_list=list(model.named_parameters()),
+            update_ratio=training_args.badam_update_ratio,
+            mask_mode=training_args.badam_mask_mode,
+            verbose=training_args.badam_verbose,
+            include_embedding=False,
+            **optim_kwargs,
+        )
+        logger.info(
+            f"Using BAdam optimizer with ratio-wise update, update ratio is {training_args.badam_update_ratio}, "
+            f"mask mode is {training_args.badam_mask_mode}"
+        )
+
+    return optimizer
+
+
+
+class CustomSeq2SeqTrainer(Seq2SeqTrainer):
+    r"""
+    Inherits Seq2SeqTrainer to use BAdam optimizer.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        print("type args:", type(self.args),self.args)
+
+        if self.args.use_badam:
+            from badam import clip_grad_norm_for_sparse_tensor
+
+            self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_for_sparse_tensor, self.accelerator)
+
+    def create_optimizer(self) -> "torch.optim.Optimizer":
+        if self.optimizer is None and self.args.use_badam:
+            self.optimizer = _create_badam_optimizer(self.model, self.args)
+        return super().create_optimizer() # 如果没有特别指定，就继承父类的optim
+
+    # @torch.enable_grad()
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        return super().training_step(model, inputs)
+
+
+def _gradient_checkpointing_enable(
+    self: "PreTrainedModel", gradient_checkpointing_kwargs: Optional[Dict[str, Any]] = None
+) -> None:
+    r"""
+    Activates gradient checkpointing for the current model.
+
+    Modification of the original method to enable gradient checkpointing for block-wise optimizer.
+    """
+    from torch.utils.checkpoint import checkpoint
+
+    if not self.supports_gradient_checkpointing:
+        raise ValueError("{} does not support gradient checkpointing.".format(self.__class__.__name__))
+
+    if gradient_checkpointing_kwargs is None:
+        gradient_checkpointing_kwargs = {"use_reentrant": True}
+
+    gradient_checkpointing_func = partial(checkpoint, **gradient_checkpointing_kwargs)
+
+    def custom_gradient_checkpointing_func(func, *args, **kwargs):
+        module: "torch.nn.Module" = func.__self__
+
+        if any(param.requires_grad for param in module.parameters()):
+            for arg in args:
+                if torch.is_tensor(arg) and torch.is_floating_point(arg):
+                    arg.requires_grad_(True)
+
+        return gradient_checkpointing_func(func, *args, **kwargs)
+
+    if "value" in inspect.signature(self._set_gradient_checkpointing).parameters:  # old GC format
+        self.apply(partial(self._set_gradient_checkpointing, value=True))
+        self.enable_input_require_grads()
+        logger.warning("You are using the old GC format, some features (e.g. BAdam) will be invalid.")
+    else:  # have already enabled input require gradients
+        self._set_gradient_checkpointing(enable=True, gradient_checkpointing_func=custom_gradient_checkpointing_func)
+
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
 
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, BAdamSeq2SeqTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
@@ -553,32 +736,63 @@ def main():
     #     data_collator=data_collator,
     #     compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     # )
-    optimizer = None
-    # optimizers = (None, None)
-    # if model_args.use_badam:
+
+
+    # model.gradient_checkpointing_enable = MethodType(gradient_checkpointing_enable, model)
+    # model.gradient_checkpointing_enable = MethodType(_gradient_checkpointing_enable, model)
+
+    disable_gradient_checkpointing = not training_args.gradient_checkpointing
+    if not disable_gradient_checkpointing: # gradient_checkpointing=true
+        if not getattr(model, "supports_gradient_checkpointing", False):
+            logger.warning("Current model does not support gradient checkpointing.")
+            print("Current model does not support gradient checkpointing.")
+        else:
+            # use_reentrant=False might increase VRAM usage (have not been empirically verified yet)
+            # According to: https://github.com/huggingface/transformers/issues/28339
+            model.gradient_checkpointing_enable = MethodType(_gradient_checkpointing_enable, model)
+            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": True})
+            setattr(model.config, "use_cache", False)  # turn off when gradient checkpointing is enabled
+            logger.info("Gradient checkpointing enabled.")
+            print("Gradient checkpointing enabled.")
+
+
+    # trainer = Seq2SeqTrainer(
+    #     model=model,
+    #     args=training_args,
+    #     train_dataset=train_dataset_merge if training_args.do_train else None,
+    #     eval_dataset=eval_dataset_merge if training_args.do_eval else None,
+    #     tokenizer=tokenizer,
+    #     data_collator=data_collator,
+    #     compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+    #     # optimizers = (optimizer, None)
+    # )
+
+    trainer = CustomSeq2SeqTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset_merge if training_args.do_train else None,
+        eval_dataset=eval_dataset_merge if training_args.do_eval else None,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+    )
+
+
+
+    # if training_args.use_badam:
     #     try:
-    #         from badam import BlockOptimizer
+    #         from badam import BlockOptimizer,clip_grad_norm_for_sparse_tensor
+    #
     #     except ImportError:
     #         # raise ImportError("Unable to import badam module. Please install badam or disable its usage.")
     #         logger.info("Unable to import badam module. Please install badam or disable its usage.")
     #
     #     # Optimizer
-    #     # Split weights in two groups, one with weight decay and the other not.
-    #     no_decay = ["bias", "LayerNorm.weight", "layer_norm.weight"]
-    #     optimizer_grouped_parameters = [
-    #         {
-    #             "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-    #             "weight_decay": training_args.weight_decay,
-    #         },
-    #         {
-    #             "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-    #             "weight_decay": 0.0,
-    #         },
-    #     ]
-    #     original_optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=training_args.learning_rate)
+    #     trainer.create_optimizer_and_scheduler(num_training_steps=training_args.max_steps)
+    #     original_optimizer = trainer.optimizer
     #
     #     # before training, add this line to wrap the original optimizer
-    #     optimizer = BlockOptimizer(
+    #     trainer.optimizer = BlockOptimizer(
     #         base_optimizer=original_optimizer,  # can be any torch.Optimizer
     #         named_parameters_list=list(model.named_parameters()),
     #         switch_block_every=100,
@@ -588,62 +802,8 @@ def main():
     #         verbose=2,  # information level, will print trainable parameters when setting to 2
     #         block_prefix_list = None
     #     )
-
-        # # Scheduler and math around the number of training steps.
-        # overrode_max_train_steps = False
-        # num_update_steps_per_epoch = math.ceil(len(train_dataloader) / training_args.gradient_accumulation_steps) # train_dataloader获取不到
-        # if training_args.max_train_steps is None:
-        #     training_args.max_train_steps = training_args.num_train_epochs * num_update_steps_per_epoch
-        #     overrode_max_train_steps = True
-        #
-        # lr_scheduler = get_scheduler(
-        #     name=training_args.lr_scheduler_type,
-        #     optimizer=optimizer,
-        #     num_warmup_steps=training_args.num_warmup_steps,
-        #     num_training_steps=training_args.max_train_steps,
-        # )
-        #
-        # optimizers = (optimizer, lr_scheduler)
-
-    model.gradient_checkpointing_enable = MethodType(gradient_checkpointing_enable, model)
-
-
-    trainer = Seq2SeqTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset_merge if training_args.do_train else None,
-        eval_dataset=eval_dataset_merge if training_args.do_eval else None,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
-        # optimizers = (optimizer, None)
-    )
-
-    if model_args.use_badam:
-        try:
-            from badam import BlockOptimizer,clip_grad_norm_for_sparse_tensor
-
-        except ImportError:
-            # raise ImportError("Unable to import badam module. Please install badam or disable its usage.")
-            logger.info("Unable to import badam module. Please install badam or disable its usage.")
-
-        # Optimizer
-        trainer.create_optimizer_and_scheduler(num_training_steps=training_args.max_steps)
-        original_optimizer = trainer.optimizer
-
-        # before training, add this line to wrap the original optimizer
-        trainer.optimizer = BlockOptimizer(
-            base_optimizer=original_optimizer,  # can be any torch.Optimizer
-            named_parameters_list=list(model.named_parameters()),
-            switch_block_every=100,
-            # switch to the new block every 50 updates, the $K$ Adam steps in paper. It can be set adaptively by $K = n/(BD)$, where $n$ is the number of training data points, $B$ is the batch size, and $D$ is the number of blocks in BAdam; see "Hyperparameter Suggestion" section for a detailed explaination about setting this hyperparameter.
-            switch_mode="random",
-            # update order of blocks, one can choose "random" (random reshuffling update order), "ascending" (update from input layer to output layer), or "descending" (update from output layer to input layer). The default is "random".
-            verbose=2,  # information level, will print trainable parameters when setting to 2
-            block_prefix_list = None
-        )
-
-        trainer.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_for_sparse_tensor, trainer.accelerator)
+    #
+    #     trainer.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_for_sparse_tensor, trainer.accelerator)
 
 
 
